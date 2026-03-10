@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { Search, Book, List as ListIcon, Loader2, BookOpen, ChevronRight } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 
-// Initialize Gemini API
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// Initialize Gemini API safely
+const apiKey = process.env.GEMINI_API_KEY || '';
+const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 const commonWords = [
   { word: 'الله', meaning: 'خودێ' },
@@ -95,6 +96,11 @@ export default function App() {
     }
 
     // 3. Fetch from API if not cached
+    if (!ai) {
+      setError('کۆدا نهێنی یا API (GEMINI_API_KEY) ل Netlify نەهاتیە دانان. ژ کەرەما خۆ ل بەشێ Environment Variables زێدە بکە.');
+      return;
+    }
+
     setIsLoadingPart(true);
     setError('');
 
@@ -151,6 +157,11 @@ export default function App() {
     }
 
     // If not found, use Gemini API
+    if (!ai) {
+      setError('کۆدا نهێنی یا API (GEMINI_API_KEY) ل Netlify نەهاتیە دانان. ژ کەرەما خۆ ل بەشێ Environment Variables زێدە بکە.');
+      return;
+    }
+
     setIsLoading(true);
     setError('');
     setSearchResult(null);
