@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Amiri+Quran&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Scheherazade+New:wght@400;700&family=Lateef:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&family=Amiri:wght@400;700&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -7,24 +7,25 @@
 }
 
 .quran-text {
+  /* Default font, can be overridden by inline styles */
   font-family: 'Amiri Quran', 'Traditional Arabic', serif;
-  color: #064e3b; /* text-emerald-900 */
+  color: #1e293b; /* text-slate-800 */
 }
 
-/* Beautiful Tajweed Colors */
-.quran-text .madd { color: #e11d48; } /* Rose 600 */
-.quran-text .ghunnah { color: #059669; } /* Emerald 600 */
-.quran-text .slnt { color: #94a3b8; } /* Slate 400 */
-.quran-text .qalqalah { color: #2563eb; } /* Blue 600 */
-.quran-text .ikhfa { color: #d97706; } /* Amber 600 */
-.quran-text .idgham { color: #7c3aed; } /* Violet 600 */
-.quran-text .iqlab { color: #0284c7; } /* Sky 600 */
+/* Highly Visible Tajweed Colors */
+.quran-text .madd { color: #FF0000; font-weight: bold; } /* Bright Red */
+.quran-text .ghunnah { color: #00A000; font-weight: bold; } /* Bright Green */
+.quran-text .slnt { color: #9E9E9E; } /* Gray (Silent) */
+.quran-text .qalqalah { color: #0000FF; font-weight: bold; } /* Bright Blue */
+.quran-text .ikhfa { color: #FF7F00; font-weight: bold; } /* Orange */
+.quran-text .idgham { color: #9C27B0; font-weight: bold; } /* Purple */
+.quran-text .iqlab { color: #00BCD4; font-weight: bold; } /* Cyan */
 
 /* Catch all specific classes */
-.quran-text [class*="madd"] { color: #e11d48; }
-.quran-text [class*="ghunnah"] { color: #059669; }
-.quran-text [class*="slnt"] { color: #94a3b8; }
-.quran-text [class*="qalqalah"] { color: #2563eb; }
-.quran-text [class*="ikhfa"] { color: #d97706; }
-.quran-text [class*="idgham"] { color: #7c3aed; }
-.quran-text [class*="iqlab"] { color: #0284c7; }
+.quran-text [class*="madd"] { color: #FF0000; font-weight: bold; }
+.quran-text [class*="ghunnah"] { color: #00A000; font-weight: bold; }
+.quran-text [class*="slnt"] { color: #9E9E9E; }
+.quran-text [class*="qalqalah"] { color: #0000FF; font-weight: bold; }
+.quran-text [class*="ikhfa"] { color: #FF7F00; font-weight: bold; }
+.quran-text [class*="idgham"] { color: #9C27B0; font-weight: bold; }
+.quran-text [class*="iqlab"] { color: #00BCD4; font-weight: bold; }

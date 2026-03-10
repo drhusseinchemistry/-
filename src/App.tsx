@@ -75,13 +75,17 @@ export default function App() {
   const [quranPage, setQuranPage] = useState(1);
   const [quranTotalPages, setQuranTotalPages] = useState(1);
   const [selectedReciter, setSelectedReciter] = useState(7);
-  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
+  const audioRef = React.useRef<HTMLAudioElement | null>(null);
   const [playingWordId, setPlayingWordId] = useState<number | null>(null);
   const [playingVerseKey, setPlayingVerseKey] = useState<string | null>(null);
   const [tafsirData, setTafsirData] = useState<Record<string, string>>({});
   const [isLoadingTafsir, setIsLoadingTafsir] = useState<Record<string, boolean>>({});
   const [generatedImages, setGeneratedImages] = useState<Record<string, string>>({});
   const [isGeneratingImage, setIsGeneratingImage] = useState<Record<string, boolean>>({});
+  
+  // Font State
+  const [selectedFont, setSelectedFont] = useState<string>('Amiri Quran');
+  const [customFonts, setCustomFonts] = useState<{name: string, url: string}[]>([]);
   
   // Quran Search State
   const [quranSearchQuery, setQuranSearchQuery] = useState('');
@@ -110,6 +114,27 @@ export default function App() {
     localStorage.removeItem('user_gemini_api_key');
     setSavedApiKey('');
     setIsKeySaved(false);
+  };
+
+  const handleFontUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const fontUrl = URL.createObjectURL(file);
+    const fontName = `CustomFont_${Date.now()}`;
+
+    const newFont = new FontFace(fontName, `url(${fontUrl})`);
+    newFont.load().then((loadedFont) => {
+      document.fonts.add(loadedFont);
+      setCustomFonts(prev => [...prev, { name: fontName, url: fontUrl }]);
+      setSelectedFont(fontName);
+    }).catch(err => {
+      console.error("Failed to load custom font", err);
+      alert("خەلەتیەک چێبوو د دەمێ بارکرنا فۆنتێ دا. پشتڕاست بە کو فۆنتێ تە دروستە (.ttf, .otf, .woff).");
+    });
+    
+    // Reset input
+    e.target.value = '';
   };
 
   // Quran Functions
@@ -163,13 +188,13 @@ export default function App() {
   };
 
   const playAudio = (url: string | undefined, type: 'word' | 'verse', id: string | number) => {
-    if (currentAudio) {
-      currentAudio.pause();
+    if (audioRef.current) {
+      audioRef.current.pause();
       if (playingWordId === id || playingVerseKey === id) {
          // Toggle pause
          setPlayingWordId(null);
          setPlayingVerseKey(null);
-         setCurrentAudio(null);
+         audioRef.current = null;
          return;
       }
     }
@@ -192,18 +217,18 @@ export default function App() {
     audio.onended = () => {
       if (type === 'word') setPlayingWordId(null);
       else setPlayingVerseKey(null);
-      setCurrentAudio(null);
+      audioRef.current = null;
     };
     
     audio.onerror = () => {
       if (type === 'word') setPlayingWordId(null);
       else setPlayingVerseKey(null);
-      setCurrentAudio(null);
+      audioRef.current = null;
       console.error("Audio failed to load:", fullUrl);
     };
 
     audio.play();
-    setCurrentAudio(audio);
+    audioRef.current = audio;
   };
 
   const handleGetTafsir = async (verseKey: string, words: any[]) => {
@@ -277,7 +302,15 @@ export default function App() {
       }
     } catch (err: any) {
       console.error(err);
-      alert('خەلەتیەک چێبوو د دەمێ دروستکرنا وێنەی دا: ' + (err.message || ''));
+      let errorMessage = 'خەلەتیەک چێبوو د دەمێ دروستکرنا وێنەی دا.';
+      
+      if (err.message && err.message.includes('429') || err.message && err.message.includes('quota')) {
+        errorMessage = 'ببورە، لیمیتێ بکارئینانا API یێ وێنە دروستکرنێ ب دوماهی هاتیە (Quota Exceeded). پێدڤییە تو API Key یەکێ دی بکاربینی یان ژی هەتا سوبەهی چاڤەڕێ بکی.';
+      } else if (err.message) {
+        errorMessage += '\n' + err.message;
+      }
+      
+      alert(errorMessage);
     } finally {
       setIsGeneratingImage(prev => ({ ...prev, [verseKey]: false }));
     }
@@ -752,6 +785,40 @@ export default function App() {
               </form>
             </div>
 
+            {/* Quran Settings Bar */}
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/60 flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-slate-600">فۆنتێ قورئانێ:</label>
+                <select 
+                  value={selectedFont} 
+                  onChange={(e) => setSelectedFont(e.target.value)}
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 text-sm outline-none focus:border-emerald-500"
+                >
+                  <option value="Amiri Quran">Amiri Quran</option>
+                  <option value="Traditional Arabic">Traditional Arabic</option>
+                  <option value="Scheherazade New">Scheherazade New</option>
+                  <option value="Lateef">Lateef</option>
+                  <option value="Noto Naskh Arabic">Noto Naskh Arabic</option>
+                  <option value="Amiri">Amiri</option>
+                  {customFonts.map(f => (
+                    <option key={f.name} value={f.name}>فۆنتێ تە ({f.name.substring(0, 10)}...)</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-slate-600 cursor-pointer bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors border border-slate-200">
+                  فۆنتەکێ باربکە (Upload)
+                  <input 
+                    type="file" 
+                    accept=".ttf,.otf,.woff,.woff2" 
+                    onChange={handleFontUpload} 
+                    className="hidden" 
+                  />
+                </label>
+              </div>
+            </div>
+
             {/* Search Results */}
             {quranSearchResults.length > 0 && !selectedSurahObj && (
               <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden p-6 md:p-8">
@@ -920,9 +987,9 @@ export default function App() {
                       onClick={() => {
                         setSelectedSurahObj(null);
                         setVerses([]);
-                        if (currentAudio) {
-                          currentAudio.pause();
-                          setCurrentAudio(null);
+                        if (audioRef.current) {
+                          audioRef.current.pause();
+                          audioRef.current = null;
                         }
                       }}
                       className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600 font-medium transition-colors shrink-0"
