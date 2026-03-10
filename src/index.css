@@ -1,24 +1,30 @@
 @import url('https://fonts.googleapis.com/css2?family=Amiri+Quran&display=swap');
 @import "tailwindcss";
 
-.quran-text {
-  font-family: 'Amiri Quran', 'Traditional Arabic', serif;
+@theme {
+  --font-quran: "Amiri Quran", serif;
+  --font-kurdish: "Noto Sans Arabic", sans-serif;
 }
 
-/* Tajweed Colors based on Quran.com API */
-.quran-text .madd { color: #E53935; } /* Red */
-.quran-text .ghunnah { color: #43A047; } /* Green */
-.quran-text .slnt { color: #9E9E9E; } /* Gray */
-.quran-text .qalqalah { color: #1E88E5; } /* Blue */
-.quran-text .ikhfa { color: #43A047; } /* Green */
-.quran-text .idgham { color: #757575; } /* Gray */
-.quran-text .iqlab { color: #1E88E5; } /* Blue */
+.quran-text {
+  font-family: 'Amiri Quran', 'Traditional Arabic', serif;
+  color: #064e3b; /* text-emerald-900 */
+}
+
+/* Beautiful Tajweed Colors */
+.quran-text .madd { color: #e11d48; } /* Rose 600 */
+.quran-text .ghunnah { color: #059669; } /* Emerald 600 */
+.quran-text .slnt { color: #94a3b8; } /* Slate 400 */
+.quran-text .qalqalah { color: #2563eb; } /* Blue 600 */
+.quran-text .ikhfa { color: #d97706; } /* Amber 600 */
+.quran-text .idgham { color: #7c3aed; } /* Violet 600 */
+.quran-text .iqlab { color: #0284c7; } /* Sky 600 */
 
 /* Catch all specific classes */
-.quran-text [class*="madd"] { color: #E53935; }
-.quran-text [class*="ghunnah"] { color: #43A047; }
-.quran-text [class*="slnt"] { color: #9E9E9E; }
-.quran-text [class*="qalqalah"] { color: #1E88E5; }
-.quran-text [class*="ikhfa"] { color: #43A047; }
-.quran-text [class*="idgham"] { color: #757575; }
-.quran-text [class*="iqlab"] { color: #1E88E5; }
+.quran-text [class*="madd"] { color: #e11d48; }
+.quran-text [class*="ghunnah"] { color: #059669; }
+.quran-text [class*="slnt"] { color: #94a3b8; }
+.quran-text [class*="qalqalah"] { color: #2563eb; }
+.quran-text [class*="ikhfa"] { color: #d97706; }
+.quran-text [class*="idgham"] { color: #7c3aed; }
+.quran-text [class*="iqlab"] { color: #0284c7; }

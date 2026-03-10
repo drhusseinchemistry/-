@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Book, List as ListIcon, Loader2, BookOpen, ChevronRight, Key, Save, Check, Play, Volume2, MessageCircle, BookHeart, Pause } from 'lucide-react';
+import { Search, Book, List as ListIcon, Loader2, BookOpen, ChevronRight, Key, Save, Check, Play, Volume2, MessageCircle, BookHeart, Pause, Image as ImageIcon } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 
 const commonWords = [
@@ -80,6 +80,8 @@ export default function App() {
   const [playingVerseKey, setPlayingVerseKey] = useState<string | null>(null);
   const [tafsirData, setTafsirData] = useState<Record<string, string>>({});
   const [isLoadingTafsir, setIsLoadingTafsir] = useState<Record<string, boolean>>({});
+  const [generatedImages, setGeneratedImages] = useState<Record<string, string>>({});
+  const [isGeneratingImage, setIsGeneratingImage] = useState<Record<string, boolean>>({});
   
   // Quran Search State
   const [quranSearchQuery, setQuranSearchQuery] = useState('');
@@ -226,6 +228,47 @@ export default function App() {
       setTafsirData(prev => ({ ...prev, [verseKey]: 'خەلەتیەک چێبوو د دەمێ ئینانا تەفسیرێ دا.' }));
     } finally {
       setIsLoadingTafsir(prev => ({ ...prev, [verseKey]: false }));
+    }
+  };
+
+  const handleGenerateImage = async (verseKey: string, words: any[]) => {
+    if (!ai) {
+      setError('کۆدا نهێنی یا API نەهاتیە دانان. ژ کەرەما خۆ ل سەرێ لاپەڕەی زێدە بکە.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (generatedImages[verseKey]) return;
+
+    const verseText = words.map(w => w.text_uthmani).join(' ');
+    const contextText = tafsirData[verseKey] ? `${verseText} - Meaning: ${tafsirData[verseKey]}` : verseText;
+
+    setIsGeneratingImage(prev => ({ ...prev, [verseKey]: true }));
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image',
+        contents: `Generate a beautiful, abstract, and spiritual Islamic art illustration representing the meaning of this Quranic verse: "${contextText}". The image should be respectful, focusing on nature, light, cosmos, or abstract geometric patterns. DO NOT include any text, human faces, or depictions of God or prophets.`,
+      });
+      
+      let imageUrl = '';
+      if (response.candidates && response.candidates[0] && response.candidates[0].content && response.candidates[0].content.parts) {
+        for (const part of response.candidates[0].content.parts) {
+          if (part.inlineData) {
+            imageUrl = `data:image/png;base64,${part.inlineData.data}`;
+            break;
+          }
+        }
+      }
+      
+      if (imageUrl) {
+        setGeneratedImages(prev => ({ ...prev, [verseKey]: imageUrl }));
+      } else {
+        throw new Error("No image generated");
+      }
+    } catch (err) {
+      console.error(err);
+      alert('خەلەتیەک چێبوو د دەمێ دروستکرنا وێنەی دا.');
+    } finally {
+      setIsGeneratingImage(prev => ({ ...prev, [verseKey]: false }));
     }
   };
 
@@ -717,7 +760,7 @@ export default function App() {
                   {quranSearchResults.map((verse) => (
                     <div key={verse.id} className="border-b border-slate-100 pb-8 last:border-0">
                       {verse.ai_explanation && (
-                        <div className="mb-6 p-4 bg-emerald-50/80 border border-emerald-100 rounded-2xl text-emerald-800 text-sm md:text-base">
+                        <div className="mb-6 p-4 bg-emerald-50/80 border border-emerald-100 rounded-2xl text-emerald-800 text-sm md:text-base font-kurdish">
                           <strong className="font-bold">بۆچی ئەڤ ئایەتە؟</strong> {verse.ai_explanation}
                         </div>
                       )}
@@ -774,15 +817,39 @@ export default function App() {
                           {isLoadingTafsir[verse.verse_key] ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
                           تەفسیرا بادینی
                         </button>
+                        
+                        <button
+                          onClick={() => handleGenerateImage(verse.verse_key, verse.words)}
+                          disabled={isGeneratingImage[verse.verse_key]}
+                          className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl hover:border-purple-400 hover:text-purple-600 text-slate-700 font-medium transition-colors disabled:opacity-50"
+                        >
+                          {isGeneratingImage[verse.verse_key] ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
+                          تەفسیر ب وێنە
+                        </button>
                       </div>
 
                       {tafsirData[verse.verse_key] && (
-                        <div className="mt-4 p-5 bg-blue-50/50 border border-blue-100 rounded-2xl text-slate-700 leading-relaxed text-lg">
+                        <div className="mt-4 p-5 bg-blue-50/50 border border-blue-100 rounded-2xl text-slate-700 leading-relaxed text-lg font-kurdish">
                           <h4 className="font-bold text-blue-800 mb-2 flex items-center gap-2">
                             <BookOpen className="w-4 h-4" />
                             تەفسیرا ئایەتێ:
                           </h4>
                           <p>{tafsirData[verse.verse_key]}</p>
+                        </div>
+                      )}
+                      
+                      {generatedImages[verse.verse_key] && (
+                        <div className="mt-4 p-5 bg-purple-50/50 border border-purple-100 rounded-2xl flex flex-col items-center">
+                          <h4 className="font-bold text-purple-800 mb-4 flex items-center gap-2 self-start font-kurdish">
+                            <ImageIcon className="w-4 h-4" />
+                            وێنەیێ تەفسیرێ:
+                          </h4>
+                          <img 
+                            src={generatedImages[verse.verse_key]} 
+                            alt="Quranic Verse Illustration" 
+                            className="w-full max-w-2xl rounded-xl shadow-md object-cover"
+                            referrerPolicy="no-referrer"
+                          />
                         </div>
                       )}
                     </div>
@@ -907,15 +974,39 @@ export default function App() {
                           {isLoadingTafsir[verse.verse_key] ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
                           تەفسیرا بادینی
                         </button>
+                        
+                        <button
+                          onClick={() => handleGenerateImage(verse.verse_key, verse.words)}
+                          disabled={isGeneratingImage[verse.verse_key]}
+                          className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl hover:border-purple-400 hover:text-purple-600 text-slate-700 font-medium transition-colors disabled:opacity-50"
+                        >
+                          {isGeneratingImage[verse.verse_key] ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
+                          تەفسیر ب وێنە
+                        </button>
                       </div>
 
                       {tafsirData[verse.verse_key] && (
-                        <div className="mt-4 p-5 bg-blue-50/50 border border-blue-100 rounded-2xl text-slate-700 leading-relaxed text-lg">
+                        <div className="mt-4 p-5 bg-blue-50/50 border border-blue-100 rounded-2xl text-slate-700 leading-relaxed text-lg font-kurdish">
                           <h4 className="font-bold text-blue-800 mb-2 flex items-center gap-2">
                             <BookOpen className="w-4 h-4" />
                             تەفسیرا ئایەتێ:
                           </h4>
                           <p>{tafsirData[verse.verse_key]}</p>
+                        </div>
+                      )}
+                      
+                      {generatedImages[verse.verse_key] && (
+                        <div className="mt-4 p-5 bg-purple-50/50 border border-purple-100 rounded-2xl flex flex-col items-center">
+                          <h4 className="font-bold text-purple-800 mb-4 flex items-center gap-2 self-start font-kurdish">
+                            <ImageIcon className="w-4 h-4" />
+                            وێنەیێ تەفسیرێ:
+                          </h4>
+                          <img 
+                            src={generatedImages[verse.verse_key]} 
+                            alt="Quranic Verse Illustration" 
+                            className="w-full max-w-2xl rounded-xl shadow-md object-cover"
+                            referrerPolicy="no-referrer"
+                          />
                         </div>
                       )}
                     </div>

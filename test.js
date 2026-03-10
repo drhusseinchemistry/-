@@ -1,7 +1,4 @@
 import https from 'https';
-https.get('https://audio.qurancdn.com/wbw/012_021_015.mp3', (res) => {
-  console.log('015 size:', res.headers['content-length'], 'status:', res.statusCode);
-});
-https.get('https://audio.qurancdn.com/wbw/012_021_016.mp3', (res) => {
-  console.log('016 size:', res.headers['content-length'], 'status:', res.statusCode);
-});
+fetch('https://api.quran.com/api/v4/verses/by_key/12:21?language=ar&words=true&word_fields=text_uthmani,audio_url')
+  .then(r=>r.json())
+  .then(d=>console.log(JSON.stringify(d.verse.words.map(w => ({text: w.text_uthmani, audio: w.audio_url})), null, 2)));
