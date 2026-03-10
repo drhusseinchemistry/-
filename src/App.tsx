@@ -101,6 +101,16 @@ export default function App() {
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [isDownloadingAll, setIsDownloadingAll] = useState(false);
 
+  // Continuous Tab State
+  const [continuousSurahObj, setContinuousSurahObj] = useState<any | null>(null);
+  const [continuousVerses, setContinuousVerses] = useState<any[]>([]);
+  const [isLoadingContinuous, setIsLoadingContinuous] = useState(false);
+  const [continuousVerseIndex, setContinuousVerseIndex] = useState<number>(0);
+  const [isContinuousAudioPlaying, setIsContinuousAudioPlaying] = useState(false);
+  const [isAutoScrolling, setIsAutoScrolling] = useState(false);
+  const [autoScrollSpeed, setAutoScrollSpeed] = useState(2);
+  const continuousAudioRef = React.useRef<HTMLAudioElement | null>(null);
+
   const activeApiKey = savedApiKey || process.env.GEMINI_API_KEY || '';
   const ai = useMemo(() => activeApiKey ? new GoogleGenAI({ apiKey: activeApiKey }) : null, [activeApiKey]);
 
@@ -249,10 +259,67 @@ export default function App() {
 
   // Quran Functions
   useEffect(() => {
-    if (activeTab === 'quran' && surahs.length === 0) {
+    if ((activeTab === 'quran' || activeTab === 'continuous') && surahs.length === 0) {
       fetchSurahs();
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'continuous') {
+      if (continuousAudioRef.current) continuousAudioRef.current.pause();
+      setIsContinuousAudioPlaying(false);
+      setIsAutoScrolling(false);
+      return;
+    }
+
+    if (isContinuousAudioPlaying && continuousVerses.length > 0) {
+      const verse = continuousVerses[continuousVerseIndex];
+      if (!verse) {
+        // End of Surah, load next Surah
+        if (continuousSurahObj && continuousSurahObj.id < 114) {
+          const nextSurah = surahs.find(s => s.id === continuousSurahObj.id + 1);
+          if (nextSurah) {
+            loadContinuousSurah(nextSurah, true);
+          }
+        } else {
+          setIsContinuousAudioPlaying(false); // End of Quran
+        }
+        return;
+      }
+
+      const url = verse.audio?.url;
+      if (url) {
+        const fullUrl = url.startsWith('http') ? url : `https://verses.quran.com/${url}`;
+        if (continuousAudioRef.current) {
+          continuousAudioRef.current.pause();
+        }
+        const audio = new Audio(fullUrl);
+        audio.onended = () => {
+          setContinuousVerseIndex(prev => prev + 1);
+        };
+        audio.onerror = () => {
+          console.error("Continuous audio failed to load:", fullUrl);
+          setContinuousVerseIndex(prev => prev + 1);
+        };
+        audio.play().catch(e => console.error("Play error:", e));
+        continuousAudioRef.current = audio;
+      } else {
+        setContinuousVerseIndex(prev => prev + 1);
+      }
+    } else if (!isContinuousAudioPlaying && continuousAudioRef.current) {
+      continuousAudioRef.current.pause();
+    }
+  }, [isContinuousAudioPlaying, continuousVerseIndex, continuousVerses, activeTab]);
+
+  useEffect(() => {
+    let scrollInterval: NodeJS.Timeout;
+    if (isAutoScrolling && activeTab === 'continuous') {
+      scrollInterval = setInterval(() => {
+        window.scrollBy({ top: autoScrollSpeed, behavior: 'auto' });
+      }, 50);
+    }
+    return () => clearInterval(scrollInterval);
+  }, [isAutoScrolling, autoScrollSpeed, activeTab]);
 
   const fetchSurahs = async () => {
     try {
@@ -285,6 +352,29 @@ export default function App() {
       console.error("Failed to fetch verses", err);
     } finally {
       setIsLoadingQuran(false);
+    }
+  };
+
+  const loadContinuousSurah = async (surah: any, autoPlay: boolean = false) => {
+    setContinuousSurahObj(surah);
+    setIsLoadingContinuous(true);
+    setContinuousVerseIndex(0);
+    setIsContinuousAudioPlaying(false);
+    if (continuousAudioRef.current) {
+      continuousAudioRef.current.pause();
+    }
+    try {
+      // Fetch all verses at once (per_page=300 covers the longest surah Al-Baqarah which is 286)
+      const res = await fetch(`https://api.quran.com/api/v4/verses/by_chapter/${surah.id}?language=ar&words=true&word_fields=text_uthmani,text_uthmani_tajweed,audio_url&audio=${selectedReciter}&page=1&per_page=300`);
+      const data = await res.json();
+      setContinuousVerses(data.verses);
+      if (autoPlay) {
+        setIsContinuousAudioPlaying(true);
+      }
+    } catch (err) {
+      console.error("Failed to fetch continuous verses", err);
+    } finally {
+      setIsLoadingContinuous(false);
     }
   };
 
@@ -339,6 +429,16 @@ export default function App() {
 
     audio.play();
     audioRef.current = audio;
+  };
+
+  const speakWord = (text: string) => {
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'ar-SA';
+      window.speechSynthesis.speak(utterance);
+    } else {
+      alert('ببورە، براوسەرێ تە پشتگیرییا خواندنا دەنگی ناکەت.');
+    }
   };
 
   const handleGetTafsir = async (verseKey: string, words: any[]) => {
@@ -691,6 +791,17 @@ export default function App() {
             قورئانا پیرۆز
           </button>
           <button
+            onClick={() => { setActiveTab('continuous'); setError(''); }}
+            className={`px-5 py-2.5 rounded-xl text-base font-medium flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'continuous'
+                ? 'bg-emerald-100/80 text-emerald-800 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            <Play className="w-4 h-4" />
+            خوێندنا بەردەوام
+          </button>
+          <button
             onClick={() => { setActiveTab('dictionary'); setError(''); }}
             className={`px-5 py-2.5 rounded-xl text-base font-medium flex items-center gap-2 transition-all whitespace-nowrap ${
               activeTab === 'dictionary'
@@ -866,8 +977,15 @@ export default function App() {
                       {partWords[selectedPart]?.map((item, index) => (
                         <div 
                           key={index} 
-                          className="p-6 border-b border-l border-slate-100 hover:bg-emerald-50/40 transition-colors flex flex-col justify-center items-center text-center group"
+                          className="p-6 border-b border-l border-slate-100 hover:bg-emerald-50/40 transition-colors flex flex-col justify-center items-center text-center group relative"
                         >
+                          <button 
+                            onClick={() => speakWord(item.word)}
+                            className="absolute top-4 left-4 p-2 bg-white rounded-full shadow-sm text-emerald-600 hover:bg-emerald-50 hover:scale-110 transition-all opacity-0 group-hover:opacity-100"
+                            title="گوهداری بکە"
+                          >
+                            <Volume2 className="w-4 h-4" />
+                          </button>
                           <span className="text-3xl font-bold text-slate-800 font-serif mb-3 group-hover:text-emerald-700 transition-colors">{item.word}</span>
                           <span className="text-emerald-600 font-medium text-lg bg-emerald-50 px-4 py-1 rounded-full">{item.meaning}</span>
                         </div>
@@ -1255,6 +1373,142 @@ export default function App() {
                       </button>
                     </div>
                   )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Continuous Tab */}
+        {activeTab === 'continuous' && (
+          <div className="space-y-6 pb-32">
+            {!continuousSurahObj ? (
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden p-6 md:p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-slate-800">خوێندنا بەردەوام</h2>
+                  {isLoadingContinuous && <Loader2 className="w-5 h-5 animate-spin text-emerald-600" />}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {surahs.map((surah) => (
+                    <button
+                      key={surah.id}
+                      onClick={() => loadContinuousSurah(surah)}
+                      className="p-4 rounded-2xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 text-slate-700 transition-all flex items-center justify-between group text-right"
+                    >
+                      <div>
+                        <span className="block font-bold text-lg text-emerald-800 group-hover:text-emerald-600">{surah.name_arabic}</span>
+                        <span className="text-xs text-slate-400">{surah.verses_count} ئایەت</span>
+                      </div>
+                      <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 group-hover:bg-emerald-200 group-hover:text-emerald-700 font-medium text-sm">
+                        {surah.id}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden">
+                <div className="p-6 md:p-8 border-b border-slate-100 bg-emerald-50/50 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sticky top-0 z-10 backdrop-blur-md">
+                  <div>
+                    <h2 className="text-3xl font-bold text-emerald-900 font-serif">{continuousSurahObj.name_arabic}</h2>
+                    <p className="text-emerald-700 mt-1">سورة {continuousSurahObj.name_arabic} - {continuousSurahObj.verses_count} ئایەت</p>
+                  </div>
+                  <button onClick={() => {
+                    setContinuousSurahObj(null);
+                    setIsContinuousAudioPlaying(false);
+                    setIsAutoScrolling(false);
+                  }} className="text-emerald-600 hover:text-emerald-800 font-medium">
+                    ڤەگەڕە بۆ لیستا سوورەتان
+                  </button>
+                </div>
+
+                <div className="p-6 md:p-8 space-y-12">
+                  {isLoadingContinuous ? (
+                    <div className="flex justify-center py-12">
+                      <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+                    </div>
+                  ) : (
+                    continuousVerses.map((verse, index) => (
+                      <div 
+                        key={verse.id} 
+                        className={`transition-colors duration-500 rounded-2xl p-4 ${index === continuousVerseIndex && isContinuousAudioPlaying ? 'bg-emerald-50/50 border border-emerald-100' : ''}`}
+                      >
+                        <div className="flex flex-wrap gap-y-6 gap-x-3 justify-start mb-6 text-right leading-loose" dir="rtl">
+                          {verse.words?.map((word: any) => (
+                            <button
+                              key={word.id}
+                              onClick={() => word.audio_url && playAudio(word.audio_url, 'word', word.id)}
+                              className={`relative group rounded-lg px-2 py-1 transition-colors ${
+                                playingWordId === word.id ? 'bg-emerald-100 text-emerald-700' : 'hover:bg-slate-100'
+                              }`}
+                            >
+                              {word.char_type_name === 'end' ? (
+                                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full border-2 border-emerald-500 text-emerald-600 text-sm font-bold mx-2">
+                                  {verse.verse_key.split(':')[1]}
+                                </span>
+                              ) : (
+                                <span 
+                                  className="text-2xl md:text-3xl leading-loose quran-text" 
+                                  style={{ fontFamily: selectedFont }}
+                                  dangerouslySetInnerHTML={{ __html: showTajweed ? (word.text_uthmani_tajweed || word.text_uthmani) : word.text_uthmani }}
+                                />
+                              )}
+                              {word.audio_url && word.char_type_name !== 'end' && (
+                                <span className="absolute -top-3 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Volume2 className="w-4 h-4 text-emerald-500" />
+                                </span>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Fixed Bottom Control Bar */}
+            {continuousSurahObj && (
+              <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-lg border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-50 p-4">
+                <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+                  
+                  {/* Audio Controls */}
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={() => setIsContinuousAudioPlaying(!isContinuousAudioPlaying)}
+                      className={`w-12 h-12 rounded-full flex items-center justify-center text-white shadow-md transition-transform hover:scale-105 active:scale-95 ${isContinuousAudioPlaying ? 'bg-amber-500 hover:bg-amber-600' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+                    >
+                      {isContinuousAudioPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-1" />}
+                    </button>
+                    <div className="text-sm font-medium text-slate-700">
+                      {isContinuousAudioPlaying ? 'دەنگ کاردکەت...' : 'دەنگ ڕاوەستیایە'}
+                    </div>
+                  </div>
+
+                  {/* Auto-scroll Controls */}
+                  <div className="flex items-center gap-4 flex-1 max-w-md w-full bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                    <button
+                      onClick={() => setIsAutoScrolling(!isAutoScrolling)}
+                      className={`px-4 py-2 rounded-xl font-medium text-sm transition-colors whitespace-nowrap ${isAutoScrolling ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-white text-slate-600 border border-slate-300 hover:bg-slate-100'}`}
+                    >
+                      {isAutoScrolling ? 'ڕاوەستاندنا لڤینێ' : 'لڤینا خۆکار'}
+                    </button>
+                    
+                    <div className="flex-1 flex items-center gap-3" dir="ltr">
+                      <span className="text-xs text-slate-500 font-medium">Slow</span>
+                      <input 
+                        type="range" 
+                        min="1" 
+                        max="10" 
+                        value={autoScrollSpeed}
+                        onChange={(e) => setAutoScrollSpeed(Number(e.target.value))}
+                        className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+                      />
+                      <span className="text-xs text-slate-500 font-medium">Fast</span>
+                    </div>
+                  </div>
+
                 </div>
               </div>
             )}
