@@ -246,7 +246,18 @@ export default function App() {
     try {
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
-        contents: `Generate a beautiful, abstract, and spiritual Islamic art illustration representing the meaning of this Quranic verse: "${contextText}". The image should be respectful, focusing on nature, light, cosmos, or abstract geometric patterns. DO NOT include any text, human faces, or depictions of God or prophets.`,
+        contents: {
+          parts: [
+            {
+              text: `A beautiful, abstract, and spiritual Islamic art illustration representing the meaning of this Quranic verse: "${verseText}". The image should be respectful, focusing on nature, light, cosmos, or abstract geometric patterns. DO NOT include any text, human faces, or depictions of God or prophets.`,
+            },
+          ],
+        },
+        config: {
+          imageConfig: {
+            aspectRatio: "16:9",
+          }
+        }
       });
       
       let imageUrl = '';
@@ -264,9 +275,9 @@ export default function App() {
       } else {
         throw new Error("No image generated");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('خەلەتیەک چێبوو د دەمێ دروستکرنا وێنەی دا.');
+      alert('خەلەتیەک چێبوو د دەمێ دروستکرنا وێنەی دا: ' + (err.message || ''));
     } finally {
       setIsGeneratingImage(prev => ({ ...prev, [verseKey]: false }));
     }
