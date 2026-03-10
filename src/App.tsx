@@ -134,7 +134,7 @@ export default function App() {
     setSelectedSurahObj(surah);
     setIsLoadingQuran(true);
     try {
-      const res = await fetch(`https://api.quran.com/api/v4/verses/by_chapter/${surah.id}?language=ar&words=true&word_fields=text_uthmani,audio_url&audio=${selectedReciter}&page=${page}&per_page=20`);
+      const res = await fetch(`https://api.quran.com/api/v4/verses/by_chapter/${surah.id}?language=ar&words=true&word_fields=text_uthmani,text_uthmani_tajweed,audio_url&audio=${selectedReciter}&page=${page}&per_page=20`);
       const data = await res.json();
       if (append) {
         setVerses(prev => [...prev, ...data.verses]);
@@ -274,7 +274,7 @@ export default function App() {
         const fetchedVerses = [];
         for (const item of aiResults) {
           try {
-            const res = await fetch(`https://api.quran.com/api/v4/verses/by_key/${item.verse_key}?language=ar&words=true&word_fields=text_uthmani,audio_url&audio=${selectedReciter}`);
+            const res = await fetch(`https://api.quran.com/api/v4/verses/by_key/${item.verse_key}?language=ar&words=true&word_fields=text_uthmani,text_uthmani_tajweed,audio_url&audio=${selectedReciter}`);
             const data = await res.json();
             if (data.verse) {
               fetchedVerses.push({
@@ -723,7 +723,7 @@ export default function App() {
                       )}
                       
                       <div className="flex flex-wrap gap-y-6 gap-x-3 justify-start mb-6 text-right leading-loose" dir="rtl">
-                        {verse.words.map((word: any) => (
+                        {verse.words?.map((word: any) => (
                           <button
                             key={word.id}
                             onClick={() => word.audio_url && playAudio(word.audio_url, 'word', word.id)}
@@ -736,7 +736,10 @@ export default function App() {
                                 {verse.verse_key.split(':')[1]}
                               </span>
                             ) : (
-                              <span className="text-2xl md:text-3xl font-serif leading-loose" style={{ fontFamily: "'Amiri', 'Traditional Arabic', serif" }}>{word.text_uthmani}</span>
+                              <span 
+                                className="text-2xl md:text-3xl leading-loose quran-text" 
+                                dangerouslySetInnerHTML={{ __html: word.text_uthmani_tajweed || word.text_uthmani }}
+                              />
                             )}
                             {word.audio_url && word.char_type_name !== 'end' && (
                               <span className="absolute -top-3 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -856,7 +859,7 @@ export default function App() {
                   {verses.map((verse) => (
                     <div key={verse.id} className="border-b border-slate-100 pb-8 last:border-0">
                       <div className="flex flex-wrap gap-y-6 gap-x-3 justify-start mb-6 text-right leading-loose" dir="rtl">
-                        {verse.words.map((word: any) => (
+                        {verse.words?.map((word: any) => (
                           <button
                             key={word.id}
                             onClick={() => word.audio_url && playAudio(word.audio_url, 'word', word.id)}
@@ -869,7 +872,10 @@ export default function App() {
                                 {verse.verse_key.split(':')[1]}
                               </span>
                             ) : (
-                              <span className="text-2xl md:text-3xl font-serif leading-loose" style={{ fontFamily: "'Amiri', 'Traditional Arabic', serif" }}>{word.text_uthmani}</span>
+                              <span 
+                                className="text-2xl md:text-3xl leading-loose quran-text" 
+                                dangerouslySetInnerHTML={{ __html: word.text_uthmani_tajweed || word.text_uthmani }}
+                              />
                             )}
                             {word.audio_url && word.char_type_name !== 'end' && (
                               <span className="absolute -top-3 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity">

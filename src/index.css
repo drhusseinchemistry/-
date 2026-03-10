@@ -1,1 +1,24 @@
+@import url('https://fonts.googleapis.com/css2?family=Amiri+Quran&display=swap');
 @import "tailwindcss";
+
+.quran-text {
+  font-family: 'Amiri Quran', 'Traditional Arabic', serif;
+}
+
+/* Tajweed Colors based on Quran.com API */
+.quran-text .madd { color: #E53935; } /* Red */
+.quran-text .ghunnah { color: #43A047; } /* Green */
+.quran-text .slnt { color: #9E9E9E; } /* Gray */
+.quran-text .qalqalah { color: #1E88E5; } /* Blue */
+.quran-text .ikhfa { color: #43A047; } /* Green */
+.quran-text .idgham { color: #757575; } /* Gray */
+.quran-text .iqlab { color: #1E88E5; } /* Blue */
+
+/* Catch all specific classes */
+.quran-text [class*="madd"] { color: #E53935; }
+.quran-text [class*="ghunnah"] { color: #43A047; }
+.quran-text [class*="slnt"] { color: #9E9E9E; }
+.quran-text [class*="qalqalah"] { color: #1E88E5; }
+.quran-text [class*="ikhfa"] { color: #43A047; }
+.quran-text [class*="idgham"] { color: #757575; }
+.quran-text [class*="iqlab"] { color: #1E88E5; }
