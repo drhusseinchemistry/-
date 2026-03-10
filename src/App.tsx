@@ -1,10 +1,6 @@
-import React, { useState } from 'react';
-import { Search, Book, List as ListIcon, Loader2, BookOpen, ChevronRight } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Search, Book, List as ListIcon, Loader2, BookOpen, ChevronRight, Key, Save, Check } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
-
-// Initialize Gemini API safely
-const apiKey = process.env.GEMINI_API_KEY || '';
-const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 const commonWords = [
   { word: 'الله', meaning: 'خودێ' },
@@ -71,6 +67,30 @@ export default function App() {
   });
   const [isLoadingPart, setIsLoadingPart] = useState(false);
 
+  // API Key State
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [savedApiKey, setSavedApiKey] = useState(() => localStorage.getItem('user_gemini_api_key') || '');
+  const [isKeySaved, setIsKeySaved] = useState(!!localStorage.getItem('user_gemini_api_key'));
+
+  const activeApiKey = savedApiKey || process.env.GEMINI_API_KEY || '';
+  const ai = useMemo(() => activeApiKey ? new GoogleGenAI({ apiKey: activeApiKey }) : null, [activeApiKey]);
+
+  const handleSaveApiKey = () => {
+    if (apiKeyInput.trim()) {
+      localStorage.setItem('user_gemini_api_key', apiKeyInput.trim());
+      setSavedApiKey(apiKeyInput.trim());
+      setIsKeySaved(true);
+      setApiKeyInput('');
+      setError(''); // Clear any previous API key errors
+    }
+  };
+
+  const handleClearApiKey = () => {
+    localStorage.removeItem('user_gemini_api_key');
+    setSavedApiKey('');
+    setIsKeySaved(false);
+  };
+
   const loadPartWords = async (part: number) => {
     setSelectedPart(part);
     
@@ -97,7 +117,7 @@ export default function App() {
 
     // 3. Fetch from API if not cached
     if (!ai) {
-      setError('کۆدا نهێنی یا API (GEMINI_API_KEY) ل Netlify نەهاتیە دانان. ژ کەرەما خۆ ل بەشێ Environment Variables زێدە بکە.');
+      setError('کۆدا نهێنی یا API نەهاتیە دانان. ژ کەرەما خۆ ل سەرێ لاپەڕەی زێدە بکە.');
       return;
     }
 
@@ -158,7 +178,7 @@ export default function App() {
 
     // If not found, use Gemini API
     if (!ai) {
-      setError('کۆدا نهێنی یا API (GEMINI_API_KEY) ل Netlify نەهاتیە دانان. ژ کەرەما خۆ ل بەشێ Environment Variables زێدە بکە.');
+      setError('کۆدا نهێنی یا API نەهاتیە دانان. ژ کەرەما خۆ ل سەرێ لاپەڕەی زێدە بکە.');
       return;
     }
 
@@ -205,6 +225,55 @@ export default function App() {
 
       {/* Main Content */}
       <main className="max-w-5xl mx-auto px-4 py-8">
+        {/* API Key Section */}
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/60 mb-6 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="bg-emerald-100 p-2.5 rounded-xl text-emerald-600 shrink-0">
+              <Key className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-800">کۆدا نهێنی (API Key)</h3>
+              <p className="text-xs text-slate-500 mt-0.5">پێدڤییە بۆ وەرگێڕان و ئینانا پەیڤان</p>
+            </div>
+          </div>
+          
+          <div className="flex w-full md:w-auto gap-2">
+            {!isKeySaved ? (
+              <>
+                <input
+                  type="password"
+                  value={apiKeyInput}
+                  onChange={(e) => setApiKeyInput(e.target.value)}
+                  placeholder="کۆدا API ل ڤێرە بنڤیسە..."
+                  className="flex-1 md:w-64 px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-left font-mono text-sm"
+                  dir="ltr"
+                />
+                <button
+                  onClick={handleSaveApiKey}
+                  disabled={!apiKeyInput.trim()}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-medium transition-colors flex items-center gap-2 disabled:opacity-50 shrink-0"
+                >
+                  <Save className="w-4 h-4" />
+                  خەزن بکە
+                </button>
+              </>
+            ) : (
+              <div className="flex items-center gap-4 bg-emerald-50 px-4 py-2.5 rounded-xl border border-emerald-100 w-full md:w-auto justify-between md:justify-start">
+                <span className="text-emerald-700 flex items-center gap-2 text-sm font-bold">
+                  <Check className="w-4 h-4" />
+                  هاتیە خەزنکرن
+                </span>
+                <button
+                  onClick={handleClearApiKey}
+                  className="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 rounded hover:bg-red-50 transition-colors"
+                >
+                  ژێببە
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Tabs */}
         <div className="flex space-x-2 space-x-reverse mb-8 bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200/60 w-fit">
           <button
