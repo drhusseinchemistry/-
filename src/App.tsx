@@ -1,58 +1,58 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Book, List as ListIcon, Loader2, BookOpen, ChevronRight, Key, Save, Check, Play, Volume2, MessageCircle, BookHeart, Pause, Image as ImageIcon } from 'lucide-react';
+import { Search, Book, List as ListIcon, Loader2, BookOpen, ChevronRight, Key, Save, Check, Play, Volume2, MessageCircle, BookHeart, Pause, Image as ImageIcon, Download } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 
 const commonWords = [
-  { word: 'الله', meaning: 'خودێ' },
-  { word: 'رب', meaning: 'پەروەردگار' },
-  { word: 'رحمن', meaning: 'دلۆڤان' },
-  { word: 'رحيم', meaning: 'میهرەبان' },
-  { word: 'مالك', meaning: 'خودان / سەروەر' },
-  { word: 'يوم', meaning: 'ڕۆژ' },
-  { word: 'دين', meaning: 'ئایین / پاداشت' },
-  { word: 'إياك', meaning: 'ب تنێ تە' },
-  { word: 'نعبد', meaning: 'ئەم پەرستنێ دکەین' },
-  { word: 'نستعين', meaning: 'ئەم هاریكاریێ دخوازین' },
-  { word: 'اهدنا', meaning: 'مە رێنمایی بکە' },
-  { word: 'صراط', meaning: 'ڕێك' },
-  { word: 'مستقيم', meaning: 'ڕاست' },
-  { word: 'صلاة', meaning: 'نڤێژ' },
-  { word: 'زكاة', meaning: 'زەكات' },
-  { word: 'سماء', meaning: 'ئەسمان' },
-  { word: 'أرض', meaning: 'ئەرد' },
-  { word: 'شمس', meaning: 'ڕۆژ (تەڤ)' },
-  { word: 'قمر', meaning: 'هەیڤ' },
-  { word: 'ماء', meaning: 'ئاڤ' },
-  { word: 'نار', meaning: 'ئاگر' },
-  { word: 'جنة', meaning: 'بەهەشت' },
-  { word: 'علم', meaning: 'زانین' },
-  { word: 'كتاب', meaning: 'پەرتووک' },
-  { word: 'نبي', meaning: 'پێغەمبەر' },
-  { word: 'رسول', meaning: 'هنارتی' },
-  { word: 'ملائكة', meaning: 'فریشتە' },
-  { word: 'إنسان', meaning: 'مرۆڤ' },
-  { word: 'حياة', meaning: 'ژیان' },
-  { word: 'موت', meaning: 'مرن' },
-  { word: 'حق', meaning: 'راستی / حەق' },
-  { word: 'باطل', meaning: 'بەتاڵ / نەڕاست' },
-  { word: 'نور', meaning: 'ڕۆناهی' },
-  { word: 'ظلمات', meaning: 'تاریاتی' },
-  { word: 'قلب', meaning: 'دل' },
-  { word: 'عقل', meaning: 'هزر / ئەقل' },
-  { word: 'خير', meaning: 'باشی / خێر' },
-  { word: 'شر', meaning: 'خرابی / شەڕ' },
-  { word: 'سلام', meaning: 'ئاشتی / سەلامەتی' },
-  { word: 'مؤمن', meaning: 'باوەڕدار' },
-  { word: 'كافر', meaning: 'بێ باوەڕ' },
-  { word: 'عمل', meaning: 'کار / کردەوە' },
-  { word: 'صبر', meaning: 'بێهنفرەهی / سەبر' },
-  { word: 'شكر', meaning: 'سووپاسگوزاری' },
-  { word: 'غفور', meaning: 'لێخۆشبوو' },
-  { word: 'عذاب', meaning: 'سزا / ئەزاب' },
-  { word: 'ثواب', meaning: 'پاداشت / خێر' },
-  { word: 'دنيا', meaning: 'جیهان / دونیا' },
-  { word: 'آخرة', meaning: 'قیامەت / ئاخیرەت' },
-  { word: 'هدى', meaning: 'رێنمایی / هیدایەت' }
+  { word: 'ٱللَّهُ', meaning: 'خودێ' },
+  { word: 'رَبِّ', meaning: 'پەروەردگار' },
+  { word: 'ٱلرَّحْمَٰنِ', meaning: 'دلۆڤان' },
+  { word: 'ٱلرَّحِيمِ', meaning: 'میهرەبان' },
+  { word: 'مَٰلِكِ', meaning: 'خودان / سەروەر' },
+  { word: 'يَوْمِ', meaning: 'ڕۆژ' },
+  { word: 'ٱلدِّينِ', meaning: 'ئایین / پاداشت' },
+  { word: 'إِيَّاكَ', meaning: 'ب تنێ تە' },
+  { word: 'نَعْبُدُ', meaning: 'ئەم پەرستنێ دکەین' },
+  { word: 'نَسْتَعِينُ', meaning: 'ئەم هاریكاریێ دخوازین' },
+  { word: 'ٱهْدِنَا', meaning: 'مە رێنمایی بکە' },
+  { word: 'ٱلصِّرَٰطَ', meaning: 'ڕێك' },
+  { word: 'ٱلْمُسْتَقِيمَ', meaning: 'ڕاست' },
+  { word: 'صَلَوٰةٌ', meaning: 'نڤێژ' },
+  { word: 'زَكَوٰةٌ', meaning: 'زەكات' },
+  { word: 'سَمَآءٌ', meaning: 'ئەسمان' },
+  { word: 'أَرْضٌ', meaning: 'ئەرد' },
+  { word: 'شَمْسٌ', meaning: 'ڕۆژ (تەڤ)' },
+  { word: 'قَمَرٌ', meaning: 'هەیڤ' },
+  { word: 'مَآءٌ', meaning: 'ئاڤ' },
+  { word: 'نَارٌ', meaning: 'ئاگر' },
+  { word: 'جَنَّةٌ', meaning: 'بەهەشت' },
+  { word: 'عِلْمٌ', meaning: 'زانین' },
+  { word: 'كِتَٰبٌ', meaning: 'پەرتووک' },
+  { word: 'نَبِىٌّ', meaning: 'پێغەمبەر' },
+  { word: 'رَسُولٌ', meaning: 'هنارتی' },
+  { word: 'مَلَٰٓئِكَةٌ', meaning: 'فریشتە' },
+  { word: 'إِنسَٰنٌ', meaning: 'مرۆڤ' },
+  { word: 'حَيَوٰةٌ', meaning: 'ژیان' },
+  { word: 'مَوْتٌ', meaning: 'مرن' },
+  { word: 'حَقٌّ', meaning: 'راستی / حەق' },
+  { word: 'بَٰطِلٌ', meaning: 'بەتاڵ / نەڕاست' },
+  { word: 'نُورٌ', meaning: 'ڕۆناهی' },
+  { word: 'ظُلُمَٰتٌ', meaning: 'تاریاتی' },
+  { word: 'قَلْبٌ', meaning: 'دل' },
+  { word: 'عَقْلٌ', meaning: 'هزر / ئەقل' },
+  { word: 'خَيْرٌ', meaning: 'باشی / خێر' },
+  { word: 'شَرٌّ', meaning: 'خرابی / شەڕ' },
+  { word: 'سَلَٰمٌ', meaning: 'ئاشتی / سەلامەتی' },
+  { word: 'مُؤْمِنٌ', meaning: 'باوەڕدار' },
+  { word: 'كَافِرٌ', meaning: 'بێ باوەڕ' },
+  { word: 'عَمَلٌ', meaning: 'کار / کردەوە' },
+  { word: 'صَبْرٌ', meaning: 'بێهنفرەهی / سەبر' },
+  { word: 'شُكْرٌ', meaning: 'سووپاسگوزاری' },
+  { word: 'غَفُورٌ', meaning: 'لێخۆشبوو' },
+  { word: 'عَذَابٌ', meaning: 'سزا / ئەزاب' },
+  { word: 'ثَوَابٌ', meaning: 'پاداشت / خێر' },
+  { word: 'دُنْيَا', meaning: 'جیهان / دونیا' },
+  { word: 'ءَاخِرَةٌ', meaning: 'قیامەت / ئاخیرەت' },
+  { word: 'هُدًى', meaning: 'رێنمایی / هیدایەت' }
 ];
 
 export default function App() {
@@ -97,6 +97,9 @@ export default function App() {
   const [savedApiKey, setSavedApiKey] = useState(() => localStorage.getItem('user_gemini_api_key') || '');
   const [isKeySaved, setIsKeySaved] = useState(!!localStorage.getItem('user_gemini_api_key'));
 
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+
   const activeApiKey = savedApiKey || process.env.GEMINI_API_KEY || '';
   const ai = useMemo(() => activeApiKey ? new GoogleGenAI({ apiKey: activeApiKey }) : null, [activeApiKey]);
 
@@ -114,6 +117,112 @@ export default function App() {
     localStorage.removeItem('user_gemini_api_key');
     setSavedApiKey('');
     setIsKeySaved(false);
+  };
+
+  const handleDownloadAll = async () => {
+    if (!ai) {
+      setError('کۆدا نهێنی یا API نەهاتیە دانان. ژ کەرەما خۆ ل سەرێ لاپەڕەی زێدە بکە.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    setIsDownloadingAll(true);
+    setDownloadProgress(0);
+    setError('');
+
+    const allWords = [];
+    
+    try {
+      for (let part = 1; part <= 100; part++) {
+        // Check cache first
+        const cached = localStorage.getItem(`quran_words_part_${part}`);
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            if (parsed && parsed.length > 0) {
+              allWords.push(...parsed);
+              setDownloadProgress(part);
+              continue;
+            }
+          } catch (e) {
+            // ignore cache error
+          }
+        }
+
+        // Fetch from API
+        let success = false;
+        let retries = 3;
+        while (!success && retries > 0) {
+          try {
+            const expectedCount = part === 100 ? 184 : 190;
+            const response = await ai.models.generateContent({
+              model: 'gemini-3-flash-preview',
+              contents: `Generate a JSON array of exactly ${expectedCount} unique Quranic Arabic words and their Kurmanji Kurdish (Arabic script) translations. This is for part ${part} out of 100 of a Quranic dictionary. Ensure the words are diverse and appropriate for a comprehensive dictionary. IMPORTANT: The Arabic words MUST include full diacritics (Tashkeel) such as Fatha, Kasra, Damma, Shadda, Sukun, etc. (e.g., "بَيِّنَة").`,
+              config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      word: { type: Type.STRING, description: "The Quranic Arabic word with full diacritics (Tashkeel)" },
+                      meaning: { type: Type.STRING, description: "The Kurmanji Kurdish meaning in Arabic script" }
+                    },
+                    required: ["word", "meaning"]
+                  }
+                }
+              }
+            });
+
+            const text = response.text?.trim();
+            if (text) {
+              const words = JSON.parse(text);
+              allWords.push(...words);
+              localStorage.setItem(`quran_words_part_${part}`, JSON.stringify(words));
+              success = true;
+            } else {
+              throw new Error("Empty response");
+            }
+          } catch (err: any) {
+            console.error(`Error fetching part ${part}:`, err);
+            if (err.message && err.message.includes('429')) {
+              // Rate limit hit, wait longer
+              await new Promise(resolve => setTimeout(resolve, 5000));
+            } else {
+              retries--;
+              await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+          }
+        }
+        
+        if (!success) {
+          throw new Error(`Failed to fetch part ${part} after retries.`);
+        }
+
+        setDownloadProgress(part);
+        // Wait to avoid rate limits (15 RPM -> 4 seconds per request)
+        await new Promise(resolve => setTimeout(resolve, 4000));
+      }
+
+      // Create and download file
+      const blob = new Blob([JSON.stringify(allWords, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'quran_dictionary_all_words.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      alert('داگرتن ب سەرکەفتیانە ب دوماهی هات!');
+    } catch (err: any) {
+      console.error(err);
+      setError('خەلەتیەک چێبوو د دەمێ داگرتنا هەمی پەیڤان دا. رەنگە لیمیتێ بکارئینانا API ب دوماهی هاتبیت. ' + (err.message || ''));
+    } finally {
+      setIsDownloadingAll(false);
+      setDownloadProgress(0);
+    }
   };
 
   const handleFontUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -419,7 +528,7 @@ export default function App() {
     try {
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Generate a JSON array of exactly ${expectedCount} unique Quranic Arabic words and their Kurmanji Kurdish (Arabic script) translations. This is for part ${part} out of 100 of a Quranic dictionary. Ensure the words are diverse and appropriate for a comprehensive dictionary.`,
+        contents: `Generate a JSON array of exactly ${expectedCount} unique Quranic Arabic words and their Kurmanji Kurdish (Arabic script) translations. This is for part ${part} out of 100 of a Quranic dictionary. Ensure the words are diverse and appropriate for a comprehensive dictionary. IMPORTANT: The Arabic words MUST include full diacritics (Tashkeel) such as Fatha, Kasra, Damma, Shadda, Sukun, etc. (e.g., "بَيِّنَة").`,
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -684,7 +793,27 @@ export default function App() {
 
             {!selectedPart ? (
               <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden p-6 md:p-8">
-                <h2 className="text-2xl font-bold text-slate-800 mb-6">بەشێن پەیڤان (١٠٠ بەش)</h2>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+                  <h2 className="text-2xl font-bold text-slate-800">بەشێن پەیڤان (١٠٠ بەش)</h2>
+                  
+                  <div className="flex items-center gap-3">
+                    {isDownloadingAll && (
+                      <div className="flex items-center gap-2 text-emerald-600 font-bold bg-emerald-50 px-4 py-2 rounded-xl">
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span>{Math.round((downloadProgress / 100) * 100)}%</span>
+                      </div>
+                    )}
+                    <button
+                      onClick={handleDownloadAll}
+                      disabled={isDownloadingAll}
+                      className="flex items-center gap-2 px-4 py-2 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 rounded-xl font-medium transition-colors disabled:opacity-50"
+                      title="هەمی پەیڤان پێکڤە داگرە"
+                    >
+                      <Download className="w-5 h-5" />
+                      داگرتنا هەمی پەیڤان
+                    </button>
+                  </div>
+                </div>
                 {error && (
                   <div className="p-4 bg-red-50 text-red-700 rounded-xl mb-6 border border-red-100">
                     {error}
@@ -859,6 +988,7 @@ export default function App() {
                             ) : (
                               <span 
                                 className="text-2xl md:text-3xl leading-loose quran-text" 
+                                style={{ fontFamily: selectedFont }}
                                 dangerouslySetInnerHTML={{ __html: word.text_uthmani_tajweed || word.text_uthmani }}
                               />
                             )}
@@ -1019,6 +1149,7 @@ export default function App() {
                             ) : (
                               <span 
                                 className="text-2xl md:text-3xl leading-loose quran-text" 
+                                style={{ fontFamily: selectedFont }}
                                 dangerouslySetInnerHTML={{ __html: word.text_uthmani_tajweed || word.text_uthmani }}
                               />
                             )}
