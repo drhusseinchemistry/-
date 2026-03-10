@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Search, Book, List as ListIcon, Loader2, BookOpen, ChevronRight, Key, Save, Check } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Search, Book, List as ListIcon, Loader2, BookOpen, ChevronRight, Key, Save, Check, Play, Volume2, MessageCircle, BookHeart, Pause } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 
 const commonWords = [
@@ -56,7 +56,7 @@ const commonWords = [
 ];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'dictionary' | 'list'>('dictionary');
+  const [activeTab, setActiveTab] = useState<'dictionary' | 'list' | 'quran'>('quran');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResult, setSearchResult] = useState<{ word: string; meaning: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -66,6 +66,20 @@ export default function App() {
     1: commonWords
   });
   const [isLoadingPart, setIsLoadingPart] = useState(false);
+
+  // Quran Tab State
+  const [surahs, setSurahs] = useState<any[]>([]);
+  const [selectedSurahObj, setSelectedSurahObj] = useState<any | null>(null);
+  const [verses, setVerses] = useState<any[]>([]);
+  const [isLoadingQuran, setIsLoadingQuran] = useState(false);
+  const [quranPage, setQuranPage] = useState(1);
+  const [quranTotalPages, setQuranTotalPages] = useState(1);
+  const [selectedReciter, setSelectedReciter] = useState(7);
+  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
+  const [playingWordId, setPlayingWordId] = useState<number | null>(null);
+  const [playingVerseKey, setPlayingVerseKey] = useState<string | null>(null);
+  const [tafsirData, setTafsirData] = useState<Record<string, string>>({});
+  const [isLoadingTafsir, setIsLoadingTafsir] = useState<Record<string, boolean>>({});
 
   // API Key State
   const [apiKeyInput, setApiKeyInput] = useState('');
@@ -89,6 +103,120 @@ export default function App() {
     localStorage.removeItem('user_gemini_api_key');
     setSavedApiKey('');
     setIsKeySaved(false);
+  };
+
+  // Quran Functions
+  useEffect(() => {
+    if (activeTab === 'quran' && surahs.length === 0) {
+      fetchSurahs();
+    }
+  }, [activeTab]);
+
+  const fetchSurahs = async () => {
+    try {
+      setIsLoadingQuran(true);
+      const res = await fetch('https://api.quran.com/api/v4/chapters?language=ar');
+      const data = await res.json();
+      setSurahs(data.chapters);
+    } catch (err) {
+      console.error("Failed to fetch surahs", err);
+    } finally {
+      setIsLoadingQuran(false);
+    }
+  };
+
+  const loadSurah = async (surah: any, page: number = 1, append: boolean = false) => {
+    setSelectedSurahObj(surah);
+    setIsLoadingQuran(true);
+    try {
+      const res = await fetch(`https://api.quran.com/api/v4/verses/by_chapter/${surah.id}?language=ar&words=true&word_fields=text_uthmani,audio_url&audio=${selectedReciter}&page=${page}&per_page=20`);
+      const data = await res.json();
+      if (append) {
+        setVerses(prev => [...prev, ...data.verses]);
+      } else {
+        setVerses(data.verses);
+        setQuranPage(1);
+      }
+      setQuranTotalPages(data.pagination.total_pages);
+      setQuranPage(page);
+    } catch (err) {
+      console.error("Failed to fetch verses", err);
+    } finally {
+      setIsLoadingQuran(false);
+    }
+  };
+
+  const handleReciterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newReciter = Number(e.target.value);
+    setSelectedReciter(newReciter);
+    if (selectedSurahObj) {
+      // Reload current surah from page 1 with new reciter
+      loadSurah(selectedSurahObj, 1, false);
+    }
+  };
+
+  const playAudio = (url: string | undefined, type: 'word' | 'verse', id: string | number) => {
+    if (currentAudio) {
+      currentAudio.pause();
+      if (playingWordId === id || playingVerseKey === id) {
+         // Toggle pause
+         setPlayingWordId(null);
+         setPlayingVerseKey(null);
+         setCurrentAudio(null);
+         return;
+      }
+    }
+    if (!url) return;
+    
+    const fullUrl = url.startsWith('http') ? url : url.startsWith('//') ? `https:${url}` : type === 'word' ? `https://audio.qurancdn.com/${url}` : `https://verses.qurancdn.com/${url}`;
+    
+    const audio = new Audio(fullUrl);
+    
+    audio.onplay = () => {
+      if (type === 'word') setPlayingWordId(id as number);
+      else setPlayingVerseKey(id as string);
+    };
+    
+    audio.onended = () => {
+      if (type === 'word') setPlayingWordId(null);
+      else setPlayingVerseKey(null);
+      setCurrentAudio(null);
+    };
+    
+    audio.onerror = () => {
+      if (type === 'word') setPlayingWordId(null);
+      else setPlayingVerseKey(null);
+      setCurrentAudio(null);
+      console.error("Audio failed to load:", fullUrl);
+    };
+
+    audio.play();
+    setCurrentAudio(audio);
+  };
+
+  const handleGetTafsir = async (verseKey: string, words: any[]) => {
+    if (!ai) {
+      setError('کۆدا نهێنی یا API نەهاتیە دانان. ژ کەرەما خۆ ل سەرێ لاپەڕەی زێدە بکە.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (tafsirData[verseKey]) return; // Already have it
+
+    const verseText = words.map(w => w.text_uthmani).join(' ');
+
+    setIsLoadingTafsir(prev => ({ ...prev, [verseKey]: true }));
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Please provide a detailed Kurdish Badini (Kurmanji in Arabic script) Tafsir (interpretation) for the following Quranic Ayah. Provide ONLY the Tafsir text, without any introductions or extra formatting. Ayah: ${verseText}`,
+      });
+      setTafsirData(prev => ({ ...prev, [verseKey]: response.text?.trim() || 'تەفسیر نەهاتە دیتن' }));
+    } catch (err) {
+      console.error(err);
+      setTafsirData(prev => ({ ...prev, [verseKey]: 'خەلەتیەک چێبوو د دەمێ ئینانا تەفسیرێ دا.' }));
+    } finally {
+      setIsLoadingTafsir(prev => ({ ...prev, [verseKey]: false }));
+    }
   };
 
   const loadPartWords = async (part: number) => {
@@ -275,10 +403,21 @@ export default function App() {
         </div>
 
         {/* Tabs */}
-        <div className="flex space-x-2 space-x-reverse mb-8 bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200/60 w-fit">
+        <div className="flex space-x-2 space-x-reverse mb-8 bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200/60 w-fit overflow-x-auto max-w-full">
+          <button
+            onClick={() => setActiveTab('quran')}
+            className={`px-5 py-2.5 rounded-xl text-base font-medium flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'quran'
+                ? 'bg-emerald-100/80 text-emerald-800 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            <BookHeart className="w-4 h-4" />
+            قورئانا پیرۆز
+          </button>
           <button
             onClick={() => setActiveTab('dictionary')}
-            className={`px-6 py-2.5 rounded-xl text-base font-medium flex items-center gap-2 transition-all ${
+            className={`px-5 py-2.5 rounded-xl text-base font-medium flex items-center gap-2 transition-all whitespace-nowrap ${
               activeTab === 'dictionary'
                 ? 'bg-emerald-100/80 text-emerald-800 shadow-sm'
                 : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
@@ -289,7 +428,7 @@ export default function App() {
           </button>
           <button
             onClick={() => setActiveTab('list')}
-            className={`px-6 py-2.5 rounded-xl text-base font-medium flex items-center gap-2 transition-all ${
+            className={`px-5 py-2.5 rounded-xl text-base font-medium flex items-center gap-2 transition-all whitespace-nowrap ${
               activeTab === 'list'
                 ? 'bg-emerald-100/80 text-emerald-800 shadow-sm'
                 : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
@@ -444,6 +583,147 @@ export default function App() {
                     </div>
                   </>
                 )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Quran Tab */}
+        {activeTab === 'quran' && (
+          <div className="space-y-6">
+            {!selectedSurahObj ? (
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden p-6 md:p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-slate-800">قورئانا پیرۆز</h2>
+                  {isLoadingQuran && <Loader2 className="w-5 h-5 animate-spin text-emerald-600" />}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {surahs.map((surah) => (
+                    <button
+                      key={surah.id}
+                      onClick={() => loadSurah(surah)}
+                      className="p-4 rounded-2xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 text-slate-700 transition-all flex items-center justify-between group text-right"
+                    >
+                      <div>
+                        <span className="block font-bold text-lg text-emerald-800 group-hover:text-emerald-600">{surah.name_arabic}</span>
+                        <span className="text-xs text-slate-400">{surah.verses_count} ئایەت</span>
+                      </div>
+                      <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 group-hover:bg-emerald-200 group-hover:text-emerald-700 font-medium text-sm">
+                        {surah.id}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden">
+                <div className="p-6 md:p-8 border-b border-slate-100 bg-emerald-50/50 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sticky top-0 z-10 backdrop-blur-md">
+                  <div>
+                    <h2 className="text-3xl font-bold text-emerald-900 font-serif">{selectedSurahObj.name_arabic}</h2>
+                    <p className="text-emerald-700 mt-1">سورة {selectedSurahObj.name_arabic} - {selectedSurahObj.verses_count} ئایەت</p>
+                  </div>
+                  
+                  <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+                    <select
+                      value={selectedReciter}
+                      onChange={handleReciterChange}
+                      className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-emerald-200 bg-white text-emerald-800 focus:ring-2 focus:ring-emerald-500 outline-none"
+                    >
+                      <option value={7}>ميشاري العفاسي</option>
+                      <option value={2}>عبد الباسط عبد الصمد</option>
+                      <option value={3}>أبو بكر الشاطري</option>
+                      <option value={4}>محمود خليل الحصري</option>
+                      <option value={9}>محمد صديق المنشاوي</option>
+                      <option value={10}>سعود الشريم</option>
+                      <option value={11}>عبد الرحمن السديس</option>
+                    </select>
+                    
+                    <button
+                      onClick={() => {
+                        setSelectedSurahObj(null);
+                        setVerses([]);
+                        if (currentAudio) {
+                          currentAudio.pause();
+                          setCurrentAudio(null);
+                        }
+                      }}
+                      className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600 font-medium transition-colors shrink-0"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                      ڤەگەڕە بۆ سوورەتان
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-4 md:p-8 space-y-8">
+                  {verses.map((verse) => (
+                    <div key={verse.id} className="border-b border-slate-100 pb-8 last:border-0">
+                      <div className="flex flex-wrap gap-y-4 gap-x-2 justify-end mb-6 text-right leading-loose" dir="rtl">
+                        {verse.words.map((word: any) => (
+                          <button
+                            key={word.id}
+                            onClick={() => word.audio_url && playAudio(word.audio_url, 'word', word.id)}
+                            className={`relative group rounded-lg px-1 py-0.5 transition-colors ${
+                              playingWordId === word.id ? 'bg-emerald-100 text-emerald-700' : 'hover:bg-slate-100'
+                            } ${word.char_type_name === 'end' ? 'text-emerald-600 font-bold mx-2' : 'text-slate-800'}`}
+                          >
+                            <span className="text-2xl md:text-3xl font-serif leading-loose">{word.text_uthmani}</span>
+                            {word.audio_url && word.char_type_name !== 'end' && (
+                              <span className="absolute -top-3 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Volume2 className="w-4 h-4 text-emerald-500" />
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                      
+                      <div className="flex flex-wrap items-center gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                        <button
+                          onClick={() => playAudio(verse.audio?.url, 'verse', verse.verse_key)}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors ${
+                            playingVerseKey === verse.verse_key 
+                              ? 'bg-emerald-600 text-white shadow-sm' 
+                              : 'bg-white border border-slate-200 text-slate-700 hover:border-emerald-400 hover:text-emerald-600'
+                          }`}
+                        >
+                          {playingVerseKey === verse.verse_key ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                          {playingVerseKey === verse.verse_key ? 'ڕاوەستینە' : 'گوهداری بکە'}
+                        </button>
+                        
+                        <button
+                          onClick={() => handleGetTafsir(verse.verse_key, verse.words)}
+                          disabled={isLoadingTafsir[verse.verse_key]}
+                          className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl hover:border-blue-400 hover:text-blue-600 text-slate-700 font-medium transition-colors disabled:opacity-50"
+                        >
+                          {isLoadingTafsir[verse.verse_key] ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
+                          تەفسیرا بادینی
+                        </button>
+                      </div>
+
+                      {tafsirData[verse.verse_key] && (
+                        <div className="mt-4 p-5 bg-blue-50/50 border border-blue-100 rounded-2xl text-slate-700 leading-relaxed text-lg">
+                          <h4 className="font-bold text-blue-800 mb-2 flex items-center gap-2">
+                            <BookOpen className="w-4 h-4" />
+                            تەفسیرا ئایەتێ:
+                          </h4>
+                          <p>{tafsirData[verse.verse_key]}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  
+                  {quranPage < quranTotalPages && (
+                    <div className="text-center pt-4">
+                      <button
+                        onClick={() => loadSurah(selectedSurahObj, quranPage + 1, true)}
+                        disabled={isLoadingQuran}
+                        className="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-8 py-3 rounded-xl font-medium transition-colors disabled:opacity-50 flex items-center gap-2 mx-auto"
+                      >
+                        {isLoadingQuran ? <Loader2 className="w-5 h-5 animate-spin" /> : 'ئایەتێن زێدەتر نیشان بدە'}
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
