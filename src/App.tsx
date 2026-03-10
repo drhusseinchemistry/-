@@ -86,6 +86,7 @@ export default function App() {
   // Font State
   const [selectedFont, setSelectedFont] = useState<string>('Amiri Quran');
   const [customFonts, setCustomFonts] = useState<{name: string, url: string}[]>([]);
+  const [showTajweed, setShowTajweed] = useState<boolean>(true);
   
   // Quran Search State
   const [quranSearchQuery, setQuranSearchQuery] = useState('');
@@ -432,6 +433,7 @@ export default function App() {
     setIsSearchingQuran(true);
     setQuranSearchResults([]);
     setSelectedSurahObj(null);
+    setError('');
     
     try {
       if (!ai) {
@@ -678,7 +680,7 @@ export default function App() {
         {/* Tabs */}
         <div className="flex space-x-2 space-x-reverse mb-8 bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200/60 w-fit overflow-x-auto max-w-full">
           <button
-            onClick={() => setActiveTab('quran')}
+            onClick={() => { setActiveTab('quran'); setError(''); }}
             className={`px-5 py-2.5 rounded-xl text-base font-medium flex items-center gap-2 transition-all whitespace-nowrap ${
               activeTab === 'quran'
                 ? 'bg-emerald-100/80 text-emerald-800 shadow-sm'
@@ -689,7 +691,7 @@ export default function App() {
             قورئانا پیرۆز
           </button>
           <button
-            onClick={() => setActiveTab('dictionary')}
+            onClick={() => { setActiveTab('dictionary'); setError(''); }}
             className={`px-5 py-2.5 rounded-xl text-base font-medium flex items-center gap-2 transition-all whitespace-nowrap ${
               activeTab === 'dictionary'
                 ? 'bg-emerald-100/80 text-emerald-800 shadow-sm'
@@ -700,7 +702,7 @@ export default function App() {
             قامووس
           </button>
           <button
-            onClick={() => setActiveTab('list')}
+            onClick={() => { setActiveTab('list'); setError(''); }}
             className={`px-5 py-2.5 rounded-xl text-base font-medium flex items-center gap-2 transition-all whitespace-nowrap ${
               activeTab === 'list'
                 ? 'bg-emerald-100/80 text-emerald-800 shadow-sm'
@@ -884,6 +886,13 @@ export default function App() {
         {/* Quran Tab */}
         {activeTab === 'quran' && (
           <div className="space-y-6">
+            {error && (
+              <div className="max-w-3xl mx-auto p-4 bg-red-50 text-red-700 rounded-2xl border border-red-100 flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                {error}
+              </div>
+            )}
+            
             {/* Quran AI Search Bar */}
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60">
               <form onSubmit={handleQuranSearch} className="max-w-3xl mx-auto">
@@ -946,6 +955,18 @@ export default function App() {
                   />
                 </label>
               </div>
+
+              <div className="flex items-center gap-2 mr-auto">
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-600 cursor-pointer select-none">
+                  <input 
+                    type="checkbox" 
+                    checked={showTajweed}
+                    onChange={(e) => setShowTajweed(e.target.checked)}
+                    className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
+                  />
+                  رەنگێن تەجویدێ
+                </label>
+              </div>
             </div>
 
             {/* Search Results */}
@@ -989,7 +1010,7 @@ export default function App() {
                               <span 
                                 className="text-2xl md:text-3xl leading-loose quran-text" 
                                 style={{ fontFamily: selectedFont }}
-                                dangerouslySetInnerHTML={{ __html: word.text_uthmani_tajweed || word.text_uthmani }}
+                                dangerouslySetInnerHTML={{ __html: showTajweed ? (word.text_uthmani_tajweed || word.text_uthmani) : word.text_uthmani }}
                               />
                             )}
                             {word.audio_url && word.char_type_name !== 'end' && (
@@ -1066,7 +1087,7 @@ export default function App() {
               </div>
             )}
 
-            {!selectedSurahObj && quranSearchResults.length === 0 ? (
+            {!selectedSurahObj && quranSearchResults.length === 0 && (
               <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden p-6 md:p-8">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-2xl font-bold text-slate-800">قورئانا پیرۆز</h2>
@@ -1090,7 +1111,9 @@ export default function App() {
                   ))}
                 </div>
               </div>
-            ) : (
+            )}
+            
+            {selectedSurahObj && (
               <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden">
                 <div className="p-6 md:p-8 border-b border-slate-100 bg-emerald-50/50 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sticky top-0 z-10 backdrop-blur-md">
                   <div>
@@ -1150,7 +1173,7 @@ export default function App() {
                               <span 
                                 className="text-2xl md:text-3xl leading-loose quran-text" 
                                 style={{ fontFamily: selectedFont }}
-                                dangerouslySetInnerHTML={{ __html: word.text_uthmani_tajweed || word.text_uthmani }}
+                                dangerouslySetInnerHTML={{ __html: showTajweed ? (word.text_uthmani_tajweed || word.text_uthmani) : word.text_uthmani }}
                               />
                             )}
                             {word.audio_url && word.char_type_name !== 'end' && (
