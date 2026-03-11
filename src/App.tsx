@@ -108,8 +108,14 @@ export default function App() {
   const [continuousVerseIndex, setContinuousVerseIndex] = useState<number>(0);
   const [isContinuousAudioPlaying, setIsContinuousAudioPlaying] = useState(false);
   const [isAutoScrolling, setIsAutoScrolling] = useState(false);
-  const [autoScrollSpeed, setAutoScrollSpeed] = useState(2);
+  const [autoScrollSpeed, setAutoScrollSpeed] = useState(5);
   const continuousAudioRef = React.useRef<HTMLAudioElement | null>(null);
+
+  const cleanTajweed = (html: string) => {
+    if (!html) return '';
+    // Remove dotted circles (U+25CC) which often appear as placeholders for Tajweed marks in some fonts
+    return html.replace(/\u25CC/g, '');
+  };
 
   const activeApiKey = savedApiKey || process.env.GEMINI_API_KEY || '';
   const ai = useMemo(() => activeApiKey ? new GoogleGenAI({ apiKey: activeApiKey }) : null, [activeApiKey]);
@@ -312,13 +318,22 @@ export default function App() {
   }, [isContinuousAudioPlaying, continuousVerseIndex, continuousVerses, activeTab]);
 
   useEffect(() => {
-    let scrollInterval: NodeJS.Timeout;
+    let requestRef: number;
+    const scroll = () => {
+      if (isAutoScrolling && activeTab === 'continuous') {
+        // Use a smaller increment for smoother motion
+        window.scrollBy(0, autoScrollSpeed / 20); 
+        requestRef = requestAnimationFrame(scroll);
+      }
+    };
+    
     if (isAutoScrolling && activeTab === 'continuous') {
-      scrollInterval = setInterval(() => {
-        window.scrollBy({ top: autoScrollSpeed, behavior: 'auto' });
-      }, 50);
+      requestRef = requestAnimationFrame(scroll);
     }
-    return () => clearInterval(scrollInterval);
+    
+    return () => {
+      if (requestRef) cancelAnimationFrame(requestRef);
+    };
   }, [isAutoScrolling, autoScrollSpeed, activeTab]);
 
   const fetchSurahs = async () => {
@@ -1129,7 +1144,7 @@ export default function App() {
                               <span 
                                 className="text-2xl md:text-3xl leading-loose quran-text" 
                                 style={{ fontFamily: selectedFont }}
-                                dangerouslySetInnerHTML={{ __html: showTajweed ? (word.text_uthmani_tajweed || word.text_uthmani) : word.text_uthmani }}
+                                dangerouslySetInnerHTML={{ __html: cleanTajweed(showTajweed ? (word.text_uthmani_tajweed || word.text_uthmani) : word.text_uthmani) }}
                               />
                             )}
                             {word.audio_url && word.char_type_name !== 'end' && (
@@ -1252,7 +1267,7 @@ export default function App() {
                       <option value={4}>محمود خليل الحصري</option>
                       <option value={9}>محمد صديق المنشاوي</option>
                       <option value={10}>سعود الشريم</option>
-                      <option value={11}>عبد الرحمن السديس</option>
+                      <option value={11}>عبد الرحمن السدیس</option>
                     </select>
                     
                     <button
@@ -1292,7 +1307,7 @@ export default function App() {
                               <span 
                                 className="text-2xl md:text-3xl leading-loose quran-text" 
                                 style={{ fontFamily: selectedFont }}
-                                dangerouslySetInnerHTML={{ __html: showTajweed ? (word.text_uthmani_tajweed || word.text_uthmani) : word.text_uthmani }}
+                                dangerouslySetInnerHTML={{ __html: cleanTajweed(showTajweed ? (word.text_uthmani_tajweed || word.text_uthmani) : word.text_uthmani) }}
                               />
                             )}
                             {word.audio_url && word.char_type_name !== 'end' && (
@@ -1432,15 +1447,22 @@ export default function App() {
                     continuousVerses.map((verse, index) => (
                       <div 
                         key={verse.id} 
-                        className={`transition-colors duration-500 rounded-2xl p-4 ${index === continuousVerseIndex && isContinuousAudioPlaying ? 'bg-emerald-50/50 border border-emerald-100' : ''}`}
+                        onClick={() => {
+                          setContinuousVerseIndex(index);
+                          setIsContinuousAudioPlaying(true);
+                        }}
+                        className={`transition-all duration-500 rounded-2xl p-6 cursor-pointer hover:bg-slate-50 border border-transparent ${index === continuousVerseIndex && isContinuousAudioPlaying ? 'bg-emerald-50/80 border-emerald-200 shadow-sm scale-[1.01]' : ''}`}
                       >
-                        <div className="flex flex-wrap gap-y-6 gap-x-3 justify-start mb-6 text-right leading-loose" dir="rtl">
+                        <div className="flex flex-wrap gap-y-6 gap-x-3 justify-start mb-2 text-right leading-loose" dir="rtl">
                           {verse.words?.map((word: any) => (
                             <button
                               key={word.id}
-                              onClick={() => word.audio_url && playAudio(word.audio_url, 'word', word.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (word.audio_url) playAudio(word.audio_url, 'word', word.id);
+                              }}
                               className={`relative group rounded-lg px-2 py-1 transition-colors ${
-                                playingWordId === word.id ? 'bg-emerald-100 text-emerald-700' : 'hover:bg-slate-100'
+                                playingWordId === word.id ? 'bg-emerald-100 text-emerald-700' : 'hover:bg-emerald-100/50'
                               }`}
                             >
                               {word.char_type_name === 'end' ? (
@@ -1451,7 +1473,7 @@ export default function App() {
                                 <span 
                                   className="text-2xl md:text-3xl leading-loose quran-text" 
                                   style={{ fontFamily: selectedFont }}
-                                  dangerouslySetInnerHTML={{ __html: showTajweed ? (word.text_uthmani_tajweed || word.text_uthmani) : word.text_uthmani }}
+                                  dangerouslySetInnerHTML={{ __html: cleanTajweed(showTajweed ? (word.text_uthmani_tajweed || word.text_uthmani) : word.text_uthmani) }}
                                 />
                               )}
                               {word.audio_url && word.char_type_name !== 'end' && (
@@ -1461,6 +1483,9 @@ export default function App() {
                               )}
                             </button>
                           ))}
+                        </div>
+                        <div className="flex justify-end">
+                           <span className="text-[10px] text-slate-400 font-medium">ئایەتا {verse.verse_key}</span>
                         </div>
                       </div>
                     ))
@@ -1497,11 +1522,11 @@ export default function App() {
                     </button>
                     
                     <div className="flex-1 flex items-center gap-3" dir="ltr">
-                      <span className="text-xs text-slate-500 font-medium">Slow</span>
+                      <span className="text-xs text-slate-500 font-medium">Very Slow</span>
                       <input 
                         type="range" 
                         min="1" 
-                        max="10" 
+                        max="50" 
                         value={autoScrollSpeed}
                         onChange={(e) => setAutoScrollSpeed(Number(e.target.value))}
                         className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
