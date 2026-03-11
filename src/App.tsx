@@ -84,10 +84,9 @@ export default function App() {
   const [isGeneratingImage, setIsGeneratingImage] = useState<Record<string, boolean>>({});
   
   // Font State
-  const [selectedFont, setSelectedFont] = useState<string>('UthmanicHafs');
+  const [selectedFont, setSelectedFont] = useState<string>('Uthmanic Hafs');
   const [customFonts, setCustomFonts] = useState<{name: string, url: string}[]>([]);
-  const [showTajweed, setShowTajweed] = useState<boolean>(false);
-  const [quranFontSize, setQuranFontSize] = useState<number>(32);
+  const [showTajweed, setShowTajweed] = useState<boolean>(true);
   
   // Quran Search State
   const [quranSearchQuery, setQuranSearchQuery] = useState('');
@@ -418,9 +417,7 @@ export default function App() {
     
     let fullUrl = url;
     if (!url.startsWith('http') && !url.startsWith('//')) {
-      // Ensure word audio has the correct prefix if it's a relative path
-      const path = (type === 'word' && !url.includes('wbw/')) ? `wbw/${url}` : url;
-      fullUrl = `https://audio.qurancdn.com/${path}`;
+      fullUrl = `https://audio.qurancdn.com/${url}`;
     } else if (url.startsWith('//')) {
       fullUrl = `https:${url}`;
     }
@@ -1068,7 +1065,7 @@ export default function App() {
                   onChange={(e) => setSelectedFont(e.target.value)}
                   className="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 text-sm outline-none focus:border-emerald-500"
                 >
-                  <option value="UthmanicHafs">KFGQPC Uthman Taha Naskh (Hafs)</option>
+                  <option value="Uthmanic Hafs">Uthman Taha Naskh (Hafs)</option>
                   <option value="Amiri Quran">Amiri Quran</option>
                   <option value="Traditional Arabic">Traditional Arabic</option>
                   <option value="Scheherazade New">Scheherazade New</option>
@@ -1134,10 +1131,7 @@ export default function App() {
                         {verse.words?.map((word: any) => (
                           <button
                             key={word.id}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (word.audio_url) playAudio(word.audio_url, 'word', word.id);
-                            }}
+                            onClick={() => word.audio_url && playAudio(word.audio_url, 'word', word.id)}
                             className={`relative group rounded-lg px-2 py-1 transition-colors ${
                               playingWordId === word.id ? 'bg-emerald-100 text-emerald-700' : 'hover:bg-slate-100'
                             }`}
@@ -1148,8 +1142,8 @@ export default function App() {
                               </span>
                             ) : (
                               <span 
-                                className={`leading-loose quran-text ${!showTajweed ? 'no-tajweed-colors' : ''}`} 
-                                style={{ fontFamily: selectedFont, fontSize: `${quranFontSize}px` }}
+                                className={`text-2xl md:text-3xl leading-loose quran-text ${!showTajweed ? 'no-tajweed-colors' : ''}`} 
+                                style={{ fontFamily: selectedFont }}
                                 dangerouslySetInnerHTML={{ __html: cleanTajweed(word.text_uthmani_tajweed || word.text_uthmani) }}
                               />
                             )}
@@ -1262,20 +1256,6 @@ export default function App() {
                   </div>
                   
                   <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-                    {/* Font Size Control */}
-                    <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-emerald-200 text-emerald-800">
-                      <span className="text-xs font-bold">A</span>
-                      <input 
-                        type="range" 
-                        min="20" 
-                        max="60" 
-                        value={quranFontSize}
-                        onChange={(e) => setQuranFontSize(Number(e.target.value))}
-                        className="w-20 h-1.5 bg-emerald-100 rounded-lg appearance-none cursor-pointer accent-emerald-600"
-                      />
-                      <span className="text-lg font-bold">A</span>
-                    </div>
-
                     <select
                       value={selectedReciter}
                       onChange={handleReciterChange}
@@ -1314,10 +1294,7 @@ export default function App() {
                         {verse.words?.map((word: any) => (
                           <button
                             key={word.id}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (word.audio_url) playAudio(word.audio_url, 'word', word.id);
-                            }}
+                            onClick={() => word.audio_url && playAudio(word.audio_url, 'word', word.id)}
                             className={`relative group rounded-lg px-2 py-1 transition-colors ${
                               playingWordId === word.id ? 'bg-emerald-100 text-emerald-700' : 'hover:bg-slate-100'
                             }`}
@@ -1328,8 +1305,8 @@ export default function App() {
                               </span>
                             ) : (
                               <span 
-                                className={`leading-loose quran-text ${!showTajweed ? 'no-tajweed-colors' : ''}`} 
-                                style={{ fontFamily: selectedFont, fontSize: `${quranFontSize}px` }}
+                                className={`text-2xl md:text-3xl leading-loose quran-text ${!showTajweed ? 'no-tajweed-colors' : ''}`} 
+                                style={{ fontFamily: selectedFont }}
                                 dangerouslySetInnerHTML={{ __html: cleanTajweed(word.text_uthmani_tajweed || word.text_uthmani) }}
                               />
                             )}
@@ -1494,8 +1471,8 @@ export default function App() {
                                 </span>
                               ) : (
                                 <span 
-                                  className={`leading-loose quran-text ${!showTajweed ? 'no-tajweed-colors' : ''}`} 
-                                  style={{ fontFamily: selectedFont, fontSize: `${quranFontSize}px` }}
+                                  className={`text-2xl md:text-3xl leading-loose quran-text ${!showTajweed ? 'no-tajweed-colors' : ''}`} 
+                                  style={{ fontFamily: selectedFont }}
                                   dangerouslySetInnerHTML={{ __html: cleanTajweed(word.text_uthmani_tajweed || word.text_uthmani) }}
                                 />
                               )}
@@ -1556,23 +1533,6 @@ export default function App() {
                       />
                       <span className="text-xs text-slate-500 font-medium">Fast</span>
                     </div>
-                  </div>
-
-                  {/* Font Size Control */}
-                  <div className="flex items-center gap-4 bg-slate-50 p-3 rounded-2xl border border-slate-200">
-                    <div className="flex items-center gap-2 text-slate-600">
-                      <span className="text-xs font-bold">A</span>
-                      <input 
-                        type="range" 
-                        min="20" 
-                        max="60" 
-                        value={quranFontSize}
-                        onChange={(e) => setQuranFontSize(Number(e.target.value))}
-                        className="w-24 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
-                      />
-                      <span className="text-lg font-bold">A</span>
-                    </div>
-                    <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">قەبارێ نڤیسینێ</span>
                   </div>
 
                 </div>
