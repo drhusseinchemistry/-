@@ -40,7 +40,7 @@ const commonWords = [
   { word: 'قَلْبٌ', meaning: 'دل' },
   { word: 'عَقْلٌ', meaning: 'هزر / ئەقل' },
   { word: 'خَيْرٌ', meaning: 'باشی / خێر' },
-  { word: 'شَرٌّ', meaning: 'خرابی / شەڕ' },
+  { word: 'شەرٌّ', meaning: 'خرابی / شەڕ' },
   { word: 'سَلَٰمٌ', meaning: 'ئاشتی / سەلامەتی' },
   { word: 'مُؤْمِنٌ', meaning: 'باوەڕدار' },
   { word: 'كَافِرٌ', meaning: 'بێ باوەڕ' },
@@ -55,8 +55,13 @@ const commonWords = [
   { word: 'هُدًى', meaning: 'رێنمایی / هیدایەت' }
 ];
 
+const cleanTajweed = (text: string) => {
+  if (!text) return '';
+  return text;
+};
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'dictionary' | 'list' | 'quran'>('quran');
+  const [activeTab, setActiveTab] = useState<'dictionary' | 'list' | 'quran' | 'adhkar'>('quran');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResult, setSearchResult] = useState<{ word: string; meaning: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -66,6 +71,11 @@ export default function App() {
     1: commonWords
   });
   const [isLoadingPart, setIsLoadingPart] = useState(false);
+
+  // Adhkar State
+  const [selectedAdhkarCategory, setSelectedAdhkarCategory] = useState<string | null>(null);
+  const [expandedAdhkarIds, setExpandedAdhkarIds] = useState<Set<string>>(new Set());
+  const [isAdhkarAudioPlaying, setIsAdhkarAudioPlaying] = useState<string | null>(null);
 
   // Quran Tab State
   const [surahs, setSurahs] = useState<any[]>([]);
@@ -128,11 +138,104 @@ export default function App() {
   const [autoScrollSpeed, setAutoScrollSpeed] = useState(5);
   const continuousAudioRef = React.useRef<HTMLAudioElement | null>(null);
 
-  const cleanTajweed = (html: string) => {
-    if (!html) return '';
-    // Remove dotted circles (U+25CC) which often appear as placeholders for Tajweed marks in some fonts
-    return html.replace(/\u25CC/g, '');
+  const toggleAdhkarExpansion = (id: string) => {
+    const newExpanded = new Set(expandedAdhkarIds);
+    if (newExpanded.has(id)) {
+      newExpanded.delete(id);
+    } else {
+      newExpanded.add(id);
+    }
+    setExpandedAdhkarIds(newExpanded);
   };
+
+  const playAdhkarAudio = async (text: string, id: string) => {
+    if (isAdhkarAudioPlaying === id) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        setIsAdhkarAudioPlaying(null);
+      }
+      return;
+    }
+
+    setIsAdhkarAudioPlaying(id);
+    try {
+      if (!ai) throw new Error('Please save your API Key first');
+      
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash-preview-tts",
+        contents: [{ parts: [{ text: `بصوت هادئ وواضح، اقرأ هذا الذكر: ${text}` }] }],
+        config: {
+          responseModalities: ["AUDIO"],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: 'Kore' },
+            },
+          },
+        },
+      });
+
+      const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      if (base64Audio) {
+        const audioSrc = `data:audio/mp3;base64,${base64Audio}`;
+        if (audioRef.current) {
+          audioRef.current.src = audioSrc;
+          audioRef.current.play();
+          audioRef.current.onended = () => setIsAdhkarAudioPlaying(null);
+        }
+      }
+    } catch (err: any) {
+      console.error('Audio error:', err);
+      setError(err.message || 'Error playing audio');
+      setIsAdhkarAudioPlaying(null);
+    }
+  };
+
+  const adhkarData = [
+    {
+      id: 'morning',
+      title: 'زکرێن سپێدێ',
+      icon: <Sun className="w-5 h-5" />,
+      items: [
+        { id: 'm1', arabic: 'أَصْبَحْنَا وَأَصْبَحَ الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ، لاَ إِلَهَ إِلاَّ اللَّهُ وَحْدَهُ لاَ شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ', kurdish: 'ئەم گەهشتینە سپێدێ و پاشایەتی هەمی بۆ خودێ یە، و سوپاسی هەمی بۆ خودێ یە، چ خودایێن دی نینن ژبلی خودێ ب تنێ، چ هەڤال بۆ نینن، پاشایەتی و سوپاسی هەر بۆ وی نە و ئەو یێ خودان شیانە ل سەر هەمی تشتان.' },
+        { id: 'm2', arabic: 'اللَّهُمَّ بِكَ أَصْبَحْنَا، وَبِكَ أَمْسَيْنَا، وَبِكَ نَحْيَا، وَبِكَ نَمُوتُ وَإِلَيْكَ النُّشُورُ', kurdish: 'خودایێ من، ب تە ئەم گەهشتینە سپێدێ، و ب تە ئەم گەهشتینە ئێڤاری، و ب تە ئەم دژین، و ب تە ئەم دمرین، و ڤەگەر هەر بۆ دەف تە یە.' },
+        { id: 'm3', arabic: 'آية الكرسي: اللَّهُ لَا إِلَهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ...', kurdish: 'ئایەتا کورسی: خودێ ئەو زاتە یێ کو چ خودایێن دی نینن ژبلی وی، ئەوێ هەر ساخ و ڕاگرێ هەمی تشتانە...' }
+      ]
+    },
+    {
+      id: 'evening',
+      title: 'زکرێن هێڤاری',
+      icon: <Moon className="w-5 h-5" />,
+      items: [
+        { id: 'e1', arabic: 'أَمْسَيْنَا وَأَمْسَى الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ، لاَ إِلَهَ إِلاَّ اللَّهُ وَحْدَهُ لاَ شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ', kurdish: 'ئەم گەهشتینە ئێڤاری و پاشایەتی هەمی بۆ خودێ یە، و سوپاسی هەمی بۆ خودێ یە، چ خودایێن دی نینن ژبلی خودێ ب تنێ، چ هەڤال بۆ نینن، پاشایەتی و سوپاسی هەر بۆ وی نە و ئەو یێ خودان شیانە ل سەر هەمی تشتان.' },
+        { id: 'e2', arabic: 'اللَّهُمَّ بِكَ أَمْسَيْنَا، وَبِكَ أَصْبَحْنَا، وَبِكَ نَحْيَا، وَبِكَ نَمُوتُ وَإِلَيْكَ الْمَصِيرُ', kurdish: 'خودایێ من، ب تە ئەم گەهشتینە ئێڤاری، و ب تە ئەم گەهشتینە سپێدێ، و ب تە ئەم دژین، و ب تە ئەم دمرین، و ڤەگەر هەر بۆ دەف تە یە.' }
+      ]
+    },
+    {
+      id: 'night',
+      title: 'زکرێن شەڤێ',
+      icon: <Pause className="w-5 h-5 rotate-90" />, // Using Pause as a placeholder or I can import CloudMoon
+      items: [
+        { id: 'n1', arabic: 'بِاسْمِكَ رَبِّي وَضَعْتُ جَنْبِي، وَبِكَ أَرْفَعُهُ، فَإِنْ أَمْسَكْتَ نَفْسِي فَارْحَمْهَا، وَإِنْ أَرْسَلْتَهَا فَاحْفَظْهَا، بِمَا تَحْفَظُ بِهِ عِبَادَكَ الصَّالِحِينَ', kurdish: 'ب ناڤێ تە پەروەردگارێ من، من تەنیشتا خۆ دانا، و ب تە ئەز دێ بلند کەم، ئەگەر تە گیانێ من گرت رەحمێ پێ ببە، و ئەگەر تە هنارتە ڤە پارێزگاریێ لێ بکە ب وێ تشتێ تو پارێزگاریێ ل بەندەیێن خۆ یێن چاک دکەی.' }
+      ]
+    },
+    {
+      id: 'prayer',
+      title: 'زکرێن پشتی نڤێژێ',
+      icon: <Check className="w-5 h-5" />,
+      items: [
+        { id: 'p1', arabic: 'أستغفر الله (ثلاثاً)، اللهم أنت السلام ومنك السلام تباركت يا ذا الجلال والإكرام', kurdish: 'داخوازا لێخۆشبوونێ ژ خودێ دکەم (سێ جاران)، خودایێ من تو سەلامەتی و سەلامەتی هەر ژ تە دهێت، تو یێ پیرۆزی ئەی خودانێ مەزناهی و رێزێ.' }
+      ]
+    },
+    {
+      id: 'dua',
+      title: 'هەمی دوعا',
+      icon: <BookHeart className="w-5 h-5" />,
+      items: [
+        { id: 'd1', arabic: 'رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً وَقِنَا عَذَابَ النَّارِ', kurdish: 'پەروەردگارێ مە، ل دونیایێ باشیێ بدە مە و ل ئاخیرەتێ ژی باشیێ بدە مە و مە ژ عەزابا ئاگری بپارێزە.' },
+        { id: 'd2', arabic: 'اللَّهُمَّ إِنِّي أَسْأَلُكَ الْعَفْوَ وَالْعَافِيَةَ فِي الدُّنْيَا وَالْآخِرَةِ', kurdish: 'خودایێ من، ئەز داخوازا لێبۆرین و ساخلەمیێ ژ تە دکەم ل دونیا و ئاخیرەتێ.' }
+      ]
+    }
+  ];
 
   const activeApiKey = savedApiKey || process.env.GEMINI_API_KEY || '';
   const ai = useMemo(() => activeApiKey ? new GoogleGenAI({ apiKey: activeApiKey }) : null, [activeApiKey]);
@@ -880,6 +983,17 @@ export default function App() {
             خوێندنا بەردەوام
           </button>
           <button
+            onClick={() => { setActiveTab('adhkar'); setError(''); }}
+            className={`px-5 py-2.5 rounded-xl text-base font-medium flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'adhkar'
+                ? (isDarkMode ? 'bg-emerald-600 text-white shadow-md' : 'bg-emerald-100/80 text-emerald-800 shadow-sm')
+                : (isDarkMode ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50')
+            }`}
+          >
+            <MessageCircle className="w-4 h-4" />
+            زکر و دوعا
+          </button>
+          <button
             onClick={() => { setActiveTab('dictionary'); setError(''); }}
             className={`px-5 py-2.5 rounded-xl text-base font-medium flex items-center gap-2 transition-all whitespace-nowrap ${
               activeTab === 'dictionary'
@@ -902,6 +1016,114 @@ export default function App() {
             لیستا پەیڤان
           </button>
         </div>
+
+        {/* Adhkar Tab */}
+        {activeTab === 'adhkar' && (
+          <div className="space-y-6">
+            {!selectedAdhkarCategory ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {adhkarData.map((category) => (
+                  <button
+                    key={category.id}
+                    onClick={() => setSelectedAdhkarCategory(category.id)}
+                    className={`p-6 rounded-3xl border transition-all flex flex-col items-center gap-4 group ${
+                      isDarkMode 
+                        ? 'bg-slate-800 border-slate-700 hover:border-emerald-500 hover:bg-emerald-900/20' 
+                        : 'bg-white border-slate-200/60 hover:border-emerald-500 hover:bg-emerald-50'
+                    }`}
+                  >
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${
+                      isDarkMode ? 'bg-slate-900 text-emerald-400 group-hover:bg-emerald-900 group-hover:text-emerald-300' : 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100'
+                    }`}>
+                      {category.icon}
+                    </div>
+                    <span className={`text-xl font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{category.title}</span>
+                    <span className={`text-sm ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>{category.items.length} زکر</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className={`${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200/60'} rounded-3xl shadow-sm border overflow-hidden transition-colors`}>
+                <div className={`p-6 md:p-8 border-b flex items-center justify-between transition-colors ${
+                  isDarkMode ? 'border-slate-700 bg-slate-900/30' : 'border-slate-100 bg-slate-50/50'
+                }`}>
+                  <div className="flex items-center gap-4">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDarkMode ? 'bg-emerald-900/40 text-emerald-400' : 'bg-emerald-100 text-emerald-600'}`}>
+                      {adhkarData.find(c => c.id === selectedAdhkarCategory)?.icon}
+                    </div>
+                    <h2 className={`text-2xl font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                      {adhkarData.find(c => c.id === selectedAdhkarCategory)?.title}
+                    </h2>
+                  </div>
+                  <button
+                    onClick={() => setSelectedAdhkarCategory(null)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors border ${
+                      isDarkMode 
+                        ? 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-700' 
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                    ڤەگەڕە
+                  </button>
+                </div>
+
+                <div className="p-4 md:p-6 space-y-4">
+                  {adhkarData.find(c => c.id === selectedAdhkarCategory)?.items.map((item) => (
+                    <div 
+                      key={item.id}
+                      className={`rounded-2xl border transition-all overflow-hidden ${
+                        isDarkMode ? 'bg-slate-900/40 border-slate-700' : 'bg-white border-slate-100 shadow-sm'
+                      }`}
+                    >
+                      <div 
+                        onClick={() => toggleAdhkarExpansion(item.id)}
+                        className="p-6 cursor-pointer hover:bg-emerald-50/10 transition-colors"
+                      >
+                        <div className="flex justify-between items-start gap-4 mb-4">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              playAdhkarAudio(item.arabic, item.id);
+                            }}
+                            className={`p-2 rounded-full transition-all ${
+                              isAdhkarAudioPlaying === item.id
+                                ? 'bg-amber-500 text-white animate-pulse'
+                                : (isDarkMode ? 'bg-slate-800 text-emerald-400 hover:bg-slate-700' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100')
+                            }`}
+                          >
+                            {isAdhkarAudioPlaying === item.id ? <Pause className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                          </button>
+                          <p 
+                            className={`text-right leading-relaxed font-serif ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}
+                            style={{ fontSize: `${fontSize}px` }}
+                            dir="rtl"
+                          >
+                            {item.arabic}
+                          </p>
+                        </div>
+                        
+                        {expandedAdhkarIds.has(item.id) && (
+                          <div className={`mt-4 pt-4 border-t ${isDarkMode ? 'border-slate-700' : 'border-slate-100'}`}>
+                            <p className={`text-lg leading-relaxed ${isDarkMode ? 'text-emerald-400/90' : 'text-emerald-700'}`}>
+                              {item.kurdish}
+                            </p>
+                          </div>
+                        )}
+                        
+                        {!expandedAdhkarIds.has(item.id) && (
+                          <div className="text-center mt-2">
+                            <span className={`text-xs font-medium ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>بۆ دیتنا رامانێ کلیک بکە</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Dictionary Tab */}
         {activeTab === 'dictionary' && (
