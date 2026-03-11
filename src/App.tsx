@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Book, List as ListIcon, Loader2, BookOpen, ChevronRight, Key, Save, Check, Play, Volume2, MessageCircle, BookHeart, Pause, Image as ImageIcon, Download } from 'lucide-react';
+import { Search, Book, List as ListIcon, Loader2, BookOpen, ChevronRight, Key, Save, Check, Play, Volume2, MessageCircle, BookHeart, Pause, Image as ImageIcon, Download, Sun, Moon, Type as TypeIcon, Plus, Minus } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 
 const commonWords = [
@@ -100,6 +100,23 @@ export default function App() {
 
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+
+  // Dark Mode & Font Size State
+  const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('dark_mode') === 'true');
+  const [fontSize, setFontSize] = useState(() => Number(localStorage.getItem('font_size')) || 28);
+
+  useEffect(() => {
+    localStorage.setItem('dark_mode', isDarkMode.toString());
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
+
+  useEffect(() => {
+    localStorage.setItem('font_size', fontSize.toString());
+  }, [fontSize]);
 
   // Continuous Tab State
   const [continuousSurahObj, setContinuousSurahObj] = useState<any | null>(null);
@@ -721,21 +738,57 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] text-slate-800 font-sans" dir="rtl">
+    <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'dark bg-slate-900 text-slate-100' : 'bg-[#f8f9fa] text-slate-800'} font-sans`} dir="rtl">
       {/* Header */}
-      <header className="bg-emerald-700 text-white shadow-lg">
-        <div className="max-w-5xl mx-auto px-4 py-8">
-          <div className="flex items-center gap-4">
-            <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm">
-              <BookOpen className="w-8 h-8 text-white" />
+      <header className={`${isDarkMode ? 'bg-slate-800 border-b border-slate-700' : 'bg-emerald-700'} text-white shadow-lg transition-colors duration-300`}>
+        <div className="max-w-5xl mx-auto px-4 py-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm">
+                <BookOpen className="w-8 h-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">
+                  فەرهەنگا پەیڤێن قورئانێ
+                </h1>
+                <p className={`mt-1 text-lg ${isDarkMode ? 'text-slate-400' : 'text-emerald-100/90'}`}>
+                  لێگەڕیان و لیستا پەیڤێن قورئانا پیرۆز ب زمانێ کوردی
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">
-                فەرهەنگا پەیڤێن قورئانێ
-              </h1>
-              <p className="mt-2 text-emerald-100/90 text-lg">
-                لێگەڕیان و لیستا پەیڤێن قورئانا پیرۆز ب زمانێ کوردی
-              </p>
+
+            {/* Controls */}
+            <div className="flex items-center gap-3 bg-black/10 p-2 rounded-2xl backdrop-blur-sm self-end md:self-auto">
+              {/* Font Size Controls */}
+              <div className="flex items-center gap-1 bg-white/10 rounded-xl p-1">
+                <button 
+                  onClick={() => setFontSize(prev => Math.max(16, prev - 2))}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                  title="بچیککرنا خەتی"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <div className="flex items-center gap-1 px-2 min-w-[60px] justify-center">
+                  <TypeIcon className="w-4 h-4 opacity-70" />
+                  <span className="text-sm font-bold">{fontSize}</span>
+                </div>
+                <button 
+                  onClick={() => setFontSize(prev => Math.min(64, prev + 2))}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                  title="مەزنکرنا خەتی"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Dark Mode Toggle */}
+              <button 
+                onClick={() => setIsDarkMode(!isDarkMode)}
+                className="p-2.5 bg-white/10 hover:bg-white/20 rounded-xl transition-all flex items-center gap-2"
+                title={isDarkMode ? 'دوخێ ڕۆناهی' : 'دوخێ تاری'}
+              >
+                {isDarkMode ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5 text-emerald-100" />}
+              </button>
             </div>
           </div>
         </div>
@@ -744,14 +797,14 @@ export default function App() {
       {/* Main Content */}
       <main className="max-w-5xl mx-auto px-4 py-8">
         {/* API Key Section */}
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/60 mb-6 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+        <div className={`${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200/60'} p-4 rounded-2xl shadow-sm border mb-6 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between transition-colors`}>
           <div className="flex items-center gap-3 w-full md:w-auto">
-            <div className="bg-emerald-100 p-2.5 rounded-xl text-emerald-600 shrink-0">
+            <div className={`${isDarkMode ? 'bg-emerald-900/40 text-emerald-400' : 'bg-emerald-100 text-emerald-600'} p-2.5 rounded-xl shrink-0`}>
               <Key className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-slate-800">کۆدا نهێنی (API Key)</h3>
-              <p className="text-xs text-slate-500 mt-0.5">پێدڤییە بۆ وەرگێڕان و ئینانا پەیڤان</p>
+              <h3 className={`font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>کۆدا نهێنی (API Key)</h3>
+              <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>پێدڤییە بۆ وەرگێڕان و ئینانا پەیڤان</p>
             </div>
           </div>
           
@@ -763,7 +816,11 @@ export default function App() {
                   value={apiKeyInput}
                   onChange={(e) => setApiKeyInput(e.target.value)}
                   placeholder="کۆدا API ل ڤێرە بنڤیسە..."
-                  className="flex-1 md:w-64 px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-left font-mono text-sm"
+                  className={`flex-1 md:w-64 px-4 py-2.5 rounded-xl border outline-none text-left font-mono text-sm transition-all ${
+                    isDarkMode 
+                      ? 'bg-slate-900 border-slate-700 text-slate-200 focus:border-emerald-500' 
+                      : 'bg-slate-50 border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500'
+                  }`}
                   dir="ltr"
                 />
                 <button
@@ -776,14 +833,18 @@ export default function App() {
                 </button>
               </>
             ) : (
-              <div className="flex items-center gap-4 bg-emerald-50 px-4 py-2.5 rounded-xl border border-emerald-100 w-full md:w-auto justify-between md:justify-start">
-                <span className="text-emerald-700 flex items-center gap-2 text-sm font-bold">
+              <div className={`flex items-center gap-4 px-4 py-2.5 rounded-xl border w-full md:w-auto justify-between md:justify-start ${
+                isDarkMode ? 'bg-emerald-900/20 border-emerald-800/50' : 'bg-emerald-50 border-emerald-100'
+              }`}>
+                <span className={`${isDarkMode ? 'text-emerald-400' : 'text-emerald-700'} flex items-center gap-2 text-sm font-bold`}>
                   <Check className="w-4 h-4" />
                   هاتیە خەزنکرن
                 </span>
                 <button
                   onClick={handleClearApiKey}
-                  className="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 rounded hover:bg-red-50 transition-colors"
+                  className={`text-xs font-medium px-2 py-1 rounded transition-colors ${
+                    isDarkMode ? 'text-red-400 hover:bg-red-900/30' : 'text-red-500 hover:text-red-700 hover:bg-red-50'
+                  }`}
                 >
                   ژێببە
                 </button>
@@ -793,13 +854,15 @@ export default function App() {
         </div>
 
         {/* Tabs */}
-        <div className="flex space-x-2 space-x-reverse mb-8 bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200/60 w-fit overflow-x-auto max-w-full">
+        <div className={`flex space-x-2 space-x-reverse mb-8 p-1.5 rounded-2xl shadow-sm border w-fit overflow-x-auto max-w-full transition-colors ${
+          isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200/60'
+        }`}>
           <button
             onClick={() => { setActiveTab('quran'); setError(''); }}
             className={`px-5 py-2.5 rounded-xl text-base font-medium flex items-center gap-2 transition-all whitespace-nowrap ${
               activeTab === 'quran'
-                ? 'bg-emerald-100/80 text-emerald-800 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                ? (isDarkMode ? 'bg-emerald-600 text-white shadow-md' : 'bg-emerald-100/80 text-emerald-800 shadow-sm')
+                : (isDarkMode ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50')
             }`}
           >
             <BookHeart className="w-4 h-4" />
@@ -809,8 +872,8 @@ export default function App() {
             onClick={() => { setActiveTab('continuous'); setError(''); }}
             className={`px-5 py-2.5 rounded-xl text-base font-medium flex items-center gap-2 transition-all whitespace-nowrap ${
               activeTab === 'continuous'
-                ? 'bg-emerald-100/80 text-emerald-800 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                ? (isDarkMode ? 'bg-emerald-600 text-white shadow-md' : 'bg-emerald-100/80 text-emerald-800 shadow-sm')
+                : (isDarkMode ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50')
             }`}
           >
             <Play className="w-4 h-4" />
@@ -820,8 +883,8 @@ export default function App() {
             onClick={() => { setActiveTab('dictionary'); setError(''); }}
             className={`px-5 py-2.5 rounded-xl text-base font-medium flex items-center gap-2 transition-all whitespace-nowrap ${
               activeTab === 'dictionary'
-                ? 'bg-emerald-100/80 text-emerald-800 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                ? (isDarkMode ? 'bg-emerald-600 text-white shadow-md' : 'bg-emerald-100/80 text-emerald-800 shadow-sm')
+                : (isDarkMode ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50')
             }`}
           >
             <Search className="w-4 h-4" />
@@ -831,8 +894,8 @@ export default function App() {
             onClick={() => { setActiveTab('list'); setError(''); }}
             className={`px-5 py-2.5 rounded-xl text-base font-medium flex items-center gap-2 transition-all whitespace-nowrap ${
               activeTab === 'list'
-                ? 'bg-emerald-100/80 text-emerald-800 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                ? (isDarkMode ? 'bg-emerald-600 text-white shadow-md' : 'bg-emerald-100/80 text-emerald-800 shadow-sm')
+                : (isDarkMode ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50')
             }`}
           >
             <ListIcon className="w-4 h-4" />
@@ -842,9 +905,9 @@ export default function App() {
 
         {/* Dictionary Tab */}
         {activeTab === 'dictionary' && (
-          <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-200/60">
+          <div className={`${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200/60'} p-6 md:p-8 rounded-3xl shadow-sm border transition-colors`}>
             <form onSubmit={handleSearch} className="max-w-2xl mx-auto mb-8">
-              <label htmlFor="search" className="block text-base font-medium text-slate-700 mb-3">
+              <label htmlFor="search" className={`block text-base font-medium mb-3 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                 ل پەیڤەکێ بگەڕە (ب عەرەبی یان کوردی)
               </label>
               <div className="flex flex-col sm:flex-row gap-3">
@@ -858,7 +921,11 @@ export default function App() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="نموونە: رحمن, ئاڤ..."
-                    className="block w-full pr-11 pl-4 py-3.5 rounded-2xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-lg bg-slate-50 focus:bg-white"
+                    className={`block w-full pr-11 pl-4 py-3.5 rounded-2xl border outline-none transition-all text-lg ${
+                      isDarkMode 
+                        ? 'bg-slate-900 border-slate-700 text-slate-200 focus:border-emerald-500' 
+                        : 'bg-slate-50 border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:bg-white'
+                    }`}
                   />
                 </div>
                 <button
@@ -872,19 +939,26 @@ export default function App() {
             </form>
 
             {error && (
-              <div className="max-w-2xl mx-auto p-4 bg-red-50/80 text-red-700 rounded-2xl border border-red-100 mb-6 flex items-center gap-3">
+              <div className={`max-w-2xl mx-auto p-4 rounded-2xl border mb-6 flex items-center gap-3 ${
+                isDarkMode ? 'bg-red-900/20 border-red-800/50 text-red-400' : 'bg-red-50/80 text-red-700 border-red-100'
+              }`}>
                 <div className="w-2 h-2 rounded-full bg-red-500"></div>
                 {error}
               </div>
             )}
 
             {searchResult && (
-              <div className="max-w-2xl mx-auto bg-gradient-to-br from-emerald-50 to-teal-50/30 border border-emerald-100/80 rounded-3xl p-10 text-center shadow-sm">
-                <h2 className="text-5xl font-bold text-emerald-950 mb-6 font-serif leading-tight">
+              <div className={`max-w-2xl mx-auto border rounded-3xl p-10 text-center shadow-sm transition-colors ${
+                isDarkMode ? 'bg-slate-900/50 border-emerald-900/50' : 'bg-gradient-to-br from-emerald-50 to-teal-50/30 border-emerald-100/80'
+              }`}>
+                <h2 
+                  className={`font-bold mb-6 font-serif leading-tight ${isDarkMode ? 'text-emerald-400' : 'text-emerald-950'}`}
+                  style={{ fontSize: `${fontSize * 1.5}px` }}
+                >
                   {searchResult.word}
                 </h2>
-                <div className="w-12 h-1.5 bg-emerald-200/60 mx-auto mb-6 rounded-full"></div>
-                <p className="text-2xl text-emerald-800 font-medium">
+                <div className={`w-12 h-1.5 mx-auto mb-6 rounded-full ${isDarkMode ? 'bg-emerald-900/40' : 'bg-emerald-200/60'}`}></div>
+                <p className={`text-2xl font-medium ${isDarkMode ? 'text-slate-300' : 'text-emerald-800'}`}>
                   {searchResult.meaning}
                 </p>
               </div>
@@ -892,11 +966,11 @@ export default function App() {
 
             {!searchResult && !isLoading && !error && (
               <div className="text-center py-16 text-slate-400 max-w-md mx-auto">
-                <div className="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5">
-                  <Book className="w-10 h-10 text-slate-300" />
+                <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5 ${isDarkMode ? 'bg-slate-900' : 'bg-slate-50'}`}>
+                  <Book className={`w-10 h-10 ${isDarkMode ? 'text-slate-700' : 'text-slate-300'}`} />
                 </div>
-                <p className="text-lg text-slate-500 font-medium">پەیڤەکێ بنڤیسە بۆ دیتنا رامانا وێ</p>
-                <p className="text-sm mt-3 text-slate-400 leading-relaxed">ئەگەر پەیڤ د لیستا مە دا نەبیت، دێ ب رێکا ژیرییا دەستکرد (AI) هێتە وەرگرتن و وەرگێڕان بۆ کوردی.</p>
+                <p className={`text-lg font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>پەیڤەکێ بنڤیسە بۆ دیتنا رامانا وێ</p>
+                <p className={`text-sm mt-3 leading-relaxed ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>ئەگەر پەیڤ د لیستا مە دا نەبیت، دێ ب رێکا ژیرییا دەستکرد (AI) هێتە وەرگرتن و وەرگێڕان بۆ کوردی.</p>
               </div>
             )}
           </div>
@@ -906,13 +980,13 @@ export default function App() {
         {activeTab === 'list' && (
           <div className="space-y-6">
             {!selectedPart && (
-              <div className="bg-emerald-50 border border-emerald-100 rounded-3xl p-6 md:p-8 flex flex-col md:flex-row items-center gap-6">
-                <div className="bg-white p-4 rounded-2xl shadow-sm text-emerald-600 shrink-0">
+              <div className={`${isDarkMode ? 'bg-emerald-900/20 border-emerald-800/50' : 'bg-emerald-50 border-emerald-100'} rounded-3xl p-6 md:p-8 flex flex-col md:flex-row items-center gap-6 transition-colors`}>
+                <div className={`${isDarkMode ? 'bg-slate-800 text-emerald-400' : 'bg-white text-emerald-600'} p-4 rounded-2xl shadow-sm shrink-0`}>
                   <BookOpen className="w-8 h-8" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-emerald-900 mb-2">زانیاری ل سەر پەیڤێن قورئانێ</h3>
-                  <p className="text-emerald-800/80 leading-relaxed">
+                  <h3 className={`text-xl font-bold mb-2 ${isDarkMode ? 'text-emerald-300' : 'text-emerald-900'}`}>زانیاری ل سەر پەیڤێن قورئانێ</h3>
+                  <p className={`${isDarkMode ? 'text-emerald-400/80' : 'text-emerald-800/80'} leading-relaxed`}>
                     د قورئانا پیرۆز دا نێزیکی <strong className="font-bold">٧٧,٤٣٠</strong> پەیڤ هەنە، لێ ئەگەر پەیڤێن دووبارەبووی لاببەین، نێزیکی <strong className="font-bold">١٨,٩٩٤</strong> پەیڤێن جودا دمینن. ل ڤێرە مە لیستەکا پەیڤێن هەرە بەربەلاڤ کرینە ١٠٠ بەش.
                   </p>
                 </div>
@@ -920,13 +994,13 @@ export default function App() {
             )}
 
             {!selectedPart ? (
-              <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden p-6 md:p-8">
+              <div className={`${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200/60'} rounded-3xl shadow-sm border overflow-hidden p-6 md:p-8 transition-colors`}>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
-                  <h2 className="text-2xl font-bold text-slate-800">بەشێن پەیڤان (١٠٠ بەش)</h2>
+                  <h2 className={`text-2xl font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>بەشێن پەیڤان (١٠٠ بەش)</h2>
                   
                   <div className="flex items-center gap-3">
                     {isDownloadingAll && (
-                      <div className="flex items-center gap-2 text-emerald-600 font-bold bg-emerald-50 px-4 py-2 rounded-xl">
+                      <div className={`${isDarkMode ? 'bg-emerald-900/40 text-emerald-400' : 'bg-emerald-50 text-emerald-600'} flex items-center gap-2 font-bold px-4 py-2 rounded-xl`}>
                         <Loader2 className="w-5 h-5 animate-spin" />
                         <span>{Math.round((downloadProgress / 100) * 100)}%</span>
                       </div>
@@ -934,7 +1008,9 @@ export default function App() {
                     <button
                       onClick={handleDownloadAll}
                       disabled={isDownloadingAll}
-                      className="flex items-center gap-2 px-4 py-2 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 rounded-xl font-medium transition-colors disabled:opacity-50"
+                      className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors disabled:opacity-50 ${
+                        isDarkMode ? 'bg-emerald-900/40 text-emerald-400 hover:bg-emerald-900/60' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                      }`}
                       title="هەمی پەیڤان پێکڤە داگرە"
                     >
                       <Download className="w-5 h-5" />
@@ -943,7 +1019,7 @@ export default function App() {
                   </div>
                 </div>
                 {error && (
-                  <div className="p-4 bg-red-50 text-red-700 rounded-xl mb-6 border border-red-100">
+                  <div className={`p-4 rounded-xl mb-6 border ${isDarkMode ? 'bg-red-900/20 border-red-800/50 text-red-400' : 'bg-red-50 text-red-700 border-red-100'}`}>
                     {error}
                   </div>
                 )}
@@ -952,12 +1028,16 @@ export default function App() {
                     <button
                       key={part}
                       onClick={() => loadPartWords(part)}
-                      className="relative p-4 rounded-2xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 transition-all flex flex-col items-center justify-center gap-2 group"
+                      className={`relative p-4 rounded-2xl border transition-all flex flex-col items-center justify-center gap-2 group ${
+                        isDarkMode 
+                          ? 'border-slate-700 hover:border-emerald-500 hover:bg-emerald-900/20 text-slate-300' 
+                          : 'border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 text-slate-700 hover:text-emerald-700'
+                      }`}
                     >
                       {localStorage.getItem(`quran_words_part_${part}`) || part === 1 ? (
                         <div className="absolute top-2 right-2 w-2.5 h-2.5 bg-emerald-500 rounded-full" title="ئۆفلاین بەردەستە"></div>
                       ) : null}
-                      <Book className="w-6 h-6 text-slate-400 group-hover:text-emerald-500 transition-colors" />
+                      <Book className={`w-6 h-6 transition-colors ${isDarkMode ? 'text-slate-600 group-hover:text-emerald-500' : 'text-slate-400 group-hover:text-emerald-500'}`} />
                       <span className="font-bold text-lg">بەشێ {part}</span>
                       <span className="text-xs text-slate-400">{part === 100 ? '١٨٤' : '١٩٠'} پەیڤ</span>
                     </button>
@@ -965,15 +1045,21 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden">
-                <div className="p-6 md:p-8 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className={`${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200/60'} rounded-3xl shadow-sm border overflow-hidden transition-colors`}>
+                <div className={`p-6 md:p-8 border-b flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-colors ${
+                  isDarkMode ? 'border-slate-700 bg-slate-900/30' : 'border-slate-100 bg-slate-50/50'
+                }`}>
                   <div>
-                    <h2 className="text-2xl font-bold text-slate-800">پەیڤێن بەشێ {selectedPart}</h2>
-                    <p className="text-slate-500 mt-2 text-lg">{selectedPart === 100 ? '١٨٤' : '١٩٠'} پەیڤ د ڤی بەشی دا هەنە.</p>
+                    <h2 className={`text-2xl font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>پەیڤێن بەشێ {selectedPart}</h2>
+                    <p className={`mt-2 text-lg ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{selectedPart === 100 ? '١٨٤' : '١٩٠'} پەیڤ د ڤی بەشی دا هەنە.</p>
                   </div>
                   <button
                     onClick={() => setSelectedPart(null)}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600 font-medium transition-colors shrink-0"
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium transition-colors shrink-0 border ${
+                      isDarkMode 
+                        ? 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-700' 
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
                   >
                     <ChevronRight className="w-5 h-5" />
                     ڤەگەڕە بۆ بەشان
@@ -984,7 +1070,7 @@ export default function App() {
                   <div className="p-20 flex flex-col items-center justify-center text-emerald-600">
                     <Loader2 className="w-12 h-12 animate-spin mb-4" />
                     <p className="text-lg font-medium">پەیڤ دهێنە ئامادەکرن ژ لایێ ژیرییا دەستکرد ڤە...</p>
-                    <p className="text-sm text-slate-500 mt-2">دبیت چەند چرکەیەک پێبچیت ژبەر زۆرییا پەیڤان ({selectedPart === 100 ? '١٨٤' : '١٩٠'} پەیڤ)</p>
+                    <p className={`text-sm mt-2 ${isDarkMode ? 'text-slate-500' : 'text-slate-500'}`}>دبیت چەند چرکەیەک پێبچیت ژبەر زۆرییا پەیڤان ({selectedPart === 100 ? '١٨٤' : '١٩٠'} پەیڤ)</p>
                   </div>
                 ) : (
                   <>
@@ -992,21 +1078,34 @@ export default function App() {
                       {partWords[selectedPart]?.map((item, index) => (
                         <div 
                           key={index} 
-                          className="p-6 border-b border-l border-slate-100 hover:bg-emerald-50/40 transition-colors flex flex-col justify-center items-center text-center group relative"
+                          className={`p-6 border-b border-l transition-colors flex flex-col justify-center items-center text-center group relative ${
+                            isDarkMode ? 'border-slate-700 hover:bg-emerald-900/20' : 'border-slate-100 hover:bg-emerald-50/40'
+                          }`}
                         >
                           <button 
                             onClick={() => speakWord(item.word)}
-                            className="absolute top-4 left-4 p-2 bg-white rounded-full shadow-sm text-emerald-600 hover:bg-emerald-50 hover:scale-110 transition-all opacity-0 group-hover:opacity-100"
+                            className={`absolute top-4 left-4 p-2 rounded-full shadow-sm transition-all opacity-0 group-hover:opacity-100 ${
+                              isDarkMode ? 'bg-slate-800 text-emerald-400 hover:bg-slate-700' : 'bg-white text-emerald-600 hover:bg-emerald-50'
+                            } hover:scale-110`}
                             title="گوهداری بکە"
                           >
                             <Volume2 className="w-4 h-4" />
                           </button>
-                          <span className="text-3xl font-bold text-slate-800 font-serif mb-3 group-hover:text-emerald-700 transition-colors">{item.word}</span>
-                          <span className="text-emerald-600 font-medium text-lg bg-emerald-50 px-4 py-1 rounded-full">{item.meaning}</span>
+                          <span 
+                            className={`font-bold font-serif mb-3 transition-colors quran-text ${isDarkMode ? 'dark-mode-text' : 'text-slate-800'} group-hover:text-emerald-700`}
+                            style={{ fontSize: `${fontSize}px` }}
+                          >
+                            {item.word}
+                          </span>
+                          <span className={`font-medium text-lg px-4 py-1 rounded-full ${isDarkMode ? 'bg-emerald-900/40 text-emerald-400' : 'bg-emerald-50 text-emerald-600'}`}>
+                            {item.meaning}
+                          </span>
                         </div>
                       ))}
                     </div>
-                    <div className="p-6 text-center text-slate-500 bg-slate-50/50 border-t border-slate-100">
+                    <div className={`p-6 text-center border-t transition-colors ${
+                      isDarkMode ? 'text-slate-500 bg-slate-900/30 border-slate-700' : 'text-slate-500 bg-slate-50/50 border-slate-100'
+                    }`}>
                       <p>ئەڤ پەیڤە هاتینە خەزنکرن و نوکە ب شێوەیێ <strong className="text-emerald-600">ئۆفلاین</strong> د بەردەستن.</p>
                     </div>
                   </>
@@ -1027,9 +1126,9 @@ export default function App() {
             )}
             
             {/* Quran AI Search Bar */}
-            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60">
+            <div className={`${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200/60'} p-6 rounded-3xl shadow-sm border transition-colors`}>
               <form onSubmit={handleQuranSearch} className="max-w-3xl mx-auto">
-                <label className="block text-base font-medium text-slate-700 mb-3">
+                <label className={`block text-base font-medium mb-3 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                   ل ئایەتەکێ بگەڕە (ب عەرەبی یان بابەتێ وێ ب کوردی بنڤیسە)
                 </label>
                 <div className="flex flex-col sm:flex-row gap-3">
@@ -1042,7 +1141,11 @@ export default function App() {
                       value={quranSearchQuery}
                       onChange={(e) => setQuranSearchQuery(e.target.value)}
                       placeholder="نموونە: ئەو ئایەتێن بەحسێ دایک و بابان دکەن..."
-                      className="block w-full pr-11 pl-4 py-3.5 rounded-2xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-lg bg-slate-50 focus:bg-white"
+                      className={`block w-full pr-11 pl-4 py-3.5 rounded-2xl border outline-none transition-all text-lg ${
+                        isDarkMode 
+                          ? 'bg-slate-900 border-slate-700 text-slate-200 focus:border-emerald-500' 
+                          : 'bg-slate-50 border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:bg-white'
+                      }`}
                     />
                   </div>
                   <button
@@ -1057,13 +1160,17 @@ export default function App() {
             </div>
 
             {/* Quran Settings Bar */}
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/60 flex flex-wrap items-center gap-4">
+            <div className={`${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200/60'} p-4 rounded-2xl shadow-sm border flex flex-wrap items-center gap-4 transition-colors`}>
               <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-slate-600">فۆنتێ قورئانێ:</label>
+                <label className={`text-sm font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>فۆنتێ قورئانێ:</label>
                 <select 
                   value={selectedFont} 
                   onChange={(e) => setSelectedFont(e.target.value)}
-                  className="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 text-sm outline-none focus:border-emerald-500"
+                  className={`px-3 py-1.5 rounded-lg border text-sm outline-none transition-colors ${
+                    isDarkMode 
+                      ? 'bg-slate-900 border-slate-700 text-slate-200 focus:border-emerald-500' 
+                      : 'bg-slate-50 border-slate-200 text-slate-700 focus:border-emerald-500'
+                  }`}
                 >
                   <option value="Uthmanic Hafs">Uthman Taha Naskh (Hafs)</option>
                   <option value="Amiri Quran">Amiri Quran</option>
@@ -1079,7 +1186,11 @@ export default function App() {
               </div>
               
               <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-slate-600 cursor-pointer bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors border border-slate-200">
+                <label className={`text-sm font-medium cursor-pointer px-3 py-1.5 rounded-lg transition-colors border ${
+                  isDarkMode 
+                    ? 'bg-slate-900 border-slate-700 text-slate-400 hover:bg-slate-700' 
+                    : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'
+                }`}>
                   فۆنتەکێ باربکە (Upload)
                   <input 
                     type="file" 
@@ -1091,7 +1202,7 @@ export default function App() {
               </div>
 
               <div className="flex items-center gap-2 mr-auto">
-                <label className="flex items-center gap-2 text-sm font-medium text-slate-600 cursor-pointer select-none">
+                <label className={`flex items-center gap-2 text-sm font-medium cursor-pointer select-none ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                   <input 
                     type="checkbox" 
                     checked={showTajweed}
@@ -1105,9 +1216,9 @@ export default function App() {
 
             {/* Search Results */}
             {quranSearchResults.length > 0 && !selectedSurahObj && (
-              <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden p-6 md:p-8">
+              <div className={`${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200/60'} rounded-3xl shadow-sm border overflow-hidden p-6 md:p-8 transition-colors`}>
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-slate-800">ئەنجامێن لێگەڕیانێ</h2>
+                  <h2 className={`text-2xl font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>ئەنجامێن لێگەڕیانێ</h2>
                   <button
                     onClick={() => {
                       setQuranSearchResults([]);
@@ -1120,9 +1231,11 @@ export default function App() {
                 </div>
                 <div className="space-y-8">
                   {quranSearchResults.map((verse) => (
-                    <div key={verse.id} className="border-b border-slate-100 pb-8 last:border-0">
+                    <div key={verse.id} className={`border-b pb-8 last:border-0 ${isDarkMode ? 'border-slate-700' : 'border-slate-100'}`}>
                       {verse.ai_explanation && (
-                        <div className="mb-6 p-4 bg-emerald-50/80 border border-emerald-100 rounded-2xl text-emerald-800 text-sm md:text-base font-kurdish">
+                        <div className={`mb-6 p-4 border rounded-2xl text-sm md:text-base font-kurdish ${
+                          isDarkMode ? 'bg-emerald-900/20 border-emerald-800/50 text-emerald-400' : 'bg-emerald-50/80 border-emerald-100 text-emerald-800'
+                        }`}>
                           <strong className="font-bold">بۆچی ئەڤ ئایەتە؟</strong> {verse.ai_explanation}
                         </div>
                       )}
@@ -1133,7 +1246,9 @@ export default function App() {
                             key={word.id}
                             onClick={() => word.audio_url && playAudio(word.audio_url, 'word', word.id)}
                             className={`relative group rounded-lg px-2 py-1 transition-colors ${
-                              playingWordId === word.id ? 'bg-emerald-100 text-emerald-700' : 'hover:bg-slate-100'
+                              playingWordId === word.id 
+                                ? (isDarkMode ? 'bg-emerald-900/40 text-emerald-400' : 'bg-emerald-100 text-emerald-700') 
+                                : (isDarkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-100')
                             }`}
                           >
                             {word.char_type_name === 'end' ? (
@@ -1142,8 +1257,8 @@ export default function App() {
                               </span>
                             ) : (
                               <span 
-                                className={`text-2xl md:text-3xl leading-loose quran-text ${!showTajweed ? 'no-tajweed-colors' : ''}`} 
-                                style={{ fontFamily: selectedFont }}
+                                className={`leading-loose quran-text ${!showTajweed ? 'no-tajweed-colors' : ''} ${isDarkMode ? 'dark-mode-text' : ''}`} 
+                                style={{ fontFamily: selectedFont, fontSize: `${fontSize}px` }}
                                 dangerouslySetInnerHTML={{ __html: cleanTajweed(word.text_uthmani_tajweed || word.text_uthmani) }}
                               />
                             )}
@@ -1156,8 +1271,12 @@ export default function App() {
                         ))}
                       </div>
                       
-                      <div className="flex flex-wrap items-center gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                        <span className="px-3 py-1.5 bg-slate-200 text-slate-700 rounded-lg font-bold text-sm mr-auto">
+                      <div className={`flex flex-wrap items-center gap-3 p-3 rounded-2xl border transition-colors ${
+                        isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-100'
+                      }`}>
+                        <span className={`px-3 py-1.5 rounded-lg font-bold text-sm mr-auto ${
+                          isDarkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-200 text-slate-700'
+                        }`}>
                           ئایەتا {verse.verse_key}
                         </span>
                         <button
@@ -1165,7 +1284,7 @@ export default function App() {
                           className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors ${
                             playingVerseKey === verse.verse_key 
                               ? 'bg-emerald-600 text-white shadow-sm' 
-                              : 'bg-white border border-slate-200 text-slate-700 hover:border-emerald-400 hover:text-emerald-600'
+                              : (isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:border-emerald-500' : 'bg-white border border-slate-200 text-slate-700 hover:border-emerald-400 hover:text-emerald-600')
                           }`}
                         >
                           {playingVerseKey === verse.verse_key ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
@@ -1175,7 +1294,9 @@ export default function App() {
                         <button
                           onClick={() => handleGetTafsir(verse.verse_key, verse.words)}
                           disabled={isLoadingTafsir[verse.verse_key]}
-                          className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl hover:border-blue-400 hover:text-blue-600 text-slate-700 font-medium transition-colors disabled:opacity-50"
+                          className={`flex items-center gap-2 px-4 py-2 border rounded-xl font-medium transition-colors disabled:opacity-50 ${
+                            isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:border-blue-500' : 'bg-white border border-slate-200 text-slate-700 hover:border-blue-400 hover:text-blue-600'
+                          }`}
                         >
                           {isLoadingTafsir[verse.verse_key] ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
                           تەفسیرا بادینی
@@ -1184,7 +1305,9 @@ export default function App() {
                         <button
                           onClick={() => handleGenerateImage(verse.verse_key, verse.words)}
                           disabled={isGeneratingImage[verse.verse_key]}
-                          className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl hover:border-purple-400 hover:text-purple-600 text-slate-700 font-medium transition-colors disabled:opacity-50"
+                          className={`flex items-center gap-2 px-4 py-2 border rounded-xl font-medium transition-colors disabled:opacity-50 ${
+                            isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:border-purple-500' : 'bg-white border border-slate-200 text-slate-700 hover:border-purple-400 hover:text-purple-600'
+                          }`}
                         >
                           {isGeneratingImage[verse.verse_key] ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
                           تەفسیر ب وێنە
@@ -1192,8 +1315,10 @@ export default function App() {
                       </div>
 
                       {tafsirData[verse.verse_key] && (
-                        <div className="mt-4 p-5 bg-blue-50/50 border border-blue-100 rounded-2xl text-slate-700 leading-relaxed text-lg font-kurdish">
-                          <h4 className="font-bold text-blue-800 mb-2 flex items-center gap-2">
+                        <div className={`mt-4 p-5 border rounded-2xl leading-relaxed text-lg font-kurdish transition-colors ${
+                          isDarkMode ? 'bg-blue-900/10 border-blue-900/30 text-slate-300' : 'bg-blue-50/50 border-blue-100 text-slate-700'
+                        }`}>
+                          <h4 className={`font-bold mb-2 flex items-center gap-2 ${isDarkMode ? 'text-blue-400' : 'text-blue-800'}`}>
                             <BookOpen className="w-4 h-4" />
                             تەفسیرا ئایەتێ:
                           </h4>
@@ -1202,8 +1327,10 @@ export default function App() {
                       )}
                       
                       {generatedImages[verse.verse_key] && (
-                        <div className="mt-4 p-5 bg-purple-50/50 border border-purple-100 rounded-2xl flex flex-col items-center">
-                          <h4 className="font-bold text-purple-800 mb-4 flex items-center gap-2 self-start font-kurdish">
+                        <div className={`mt-4 p-5 border rounded-2xl flex flex-col items-center transition-colors ${
+                          isDarkMode ? 'bg-purple-900/10 border-purple-900/30' : 'bg-purple-50/50 border-purple-100'
+                        }`}>
+                          <h4 className={`font-bold mb-4 flex items-center gap-2 self-start font-kurdish ${isDarkMode ? 'text-purple-400' : 'text-purple-800'}`}>
                             <ImageIcon className="w-4 h-4" />
                             وێنەیێ تەفسیرێ:
                           </h4>
@@ -1222,9 +1349,9 @@ export default function App() {
             )}
 
             {!selectedSurahObj && quranSearchResults.length === 0 && (
-              <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden p-6 md:p-8">
+              <div className={`${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200/60'} rounded-3xl shadow-sm border overflow-hidden p-6 md:p-8 transition-colors`}>
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-slate-800">قورئانا پیرۆز</h2>
+                  <h2 className={`text-2xl font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>قورئانا پیرۆز</h2>
                   {isLoadingQuran && <Loader2 className="w-5 h-5 animate-spin text-emerald-600" />}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -1232,13 +1359,19 @@ export default function App() {
                     <button
                       key={surah.id}
                       onClick={() => loadSurah(surah)}
-                      className="p-4 rounded-2xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 text-slate-700 transition-all flex items-center justify-between group text-right"
+                      className={`p-4 rounded-2xl border transition-all flex items-center justify-between group text-right ${
+                        isDarkMode 
+                          ? 'border-slate-700 hover:border-emerald-500 hover:bg-emerald-900/20 text-slate-300' 
+                          : 'border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 text-slate-700'
+                      }`}
                     >
                       <div>
-                        <span className="block font-bold text-lg text-emerald-800 group-hover:text-emerald-600">{surah.name_arabic}</span>
+                        <span className={`block font-bold text-lg group-hover:text-emerald-500 ${isDarkMode ? 'text-emerald-400' : 'text-emerald-800'}`}>{surah.name_arabic}</span>
                         <span className="text-xs text-slate-400">{surah.verses_count} ئایەت</span>
                       </div>
-                      <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 group-hover:bg-emerald-200 group-hover:text-emerald-700 font-medium text-sm">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-medium text-sm transition-colors ${
+                        isDarkMode ? 'bg-slate-900 text-slate-500 group-hover:bg-emerald-900 group-hover:text-emerald-400' : 'bg-slate-100 text-slate-500 group-hover:bg-emerald-200 group-hover:text-emerald-700'
+                      }`}>
                         {surah.id}
                       </div>
                     </button>
@@ -1248,18 +1381,24 @@ export default function App() {
             )}
             
             {selectedSurahObj && (
-              <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden">
-                <div className="p-6 md:p-8 border-b border-slate-100 bg-emerald-50/50 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sticky top-0 z-10 backdrop-blur-md">
+              <div className={`${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200/60'} rounded-3xl shadow-sm border overflow-hidden transition-colors`}>
+                <div className={`p-6 md:p-8 border-b flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sticky top-0 z-10 backdrop-blur-md transition-colors ${
+                  isDarkMode ? 'border-slate-700 bg-slate-800/80' : 'border-slate-100 bg-emerald-50/50'
+                }`}>
                   <div>
-                    <h2 className="text-3xl font-bold text-emerald-900 font-serif">{selectedSurahObj.name_arabic}</h2>
-                    <p className="text-emerald-700 mt-1">سورة {selectedSurahObj.name_arabic} - {selectedSurahObj.verses_count} ئایەت</p>
+                    <h2 className={`text-3xl font-bold font-serif ${isDarkMode ? 'text-emerald-400' : 'text-emerald-900'}`}>{selectedSurahObj.name_arabic}</h2>
+                    <p className={`${isDarkMode ? 'text-emerald-500' : 'text-emerald-700'} mt-1`}>سورة {selectedSurahObj.name_arabic} - {selectedSurahObj.verses_count} ئایەت</p>
                   </div>
                   
                   <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
                     <select
                       value={selectedReciter}
                       onChange={handleReciterChange}
-                      className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-emerald-200 bg-white text-emerald-800 focus:ring-2 focus:ring-emerald-500 outline-none"
+                      className={`w-full sm:w-auto px-4 py-2.5 rounded-xl border outline-none transition-colors ${
+                        isDarkMode 
+                          ? 'bg-slate-900 border-slate-700 text-emerald-400 focus:border-emerald-500' 
+                          : 'bg-white border-emerald-200 text-emerald-800 focus:ring-2 focus:ring-emerald-500'
+                      }`}
                     >
                       <option value={7}>ميشاري العفاسي</option>
                       <option value={2}>عبد الباسط عبد الصمد</option>
@@ -1279,7 +1418,9 @@ export default function App() {
                           audioRef.current = null;
                         }
                       }}
-                      className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600 font-medium transition-colors shrink-0"
+                      className={`w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 border rounded-xl font-medium transition-colors shrink-0 ${
+                        isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-slate-200' : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
+                      }`}
                     >
                       <ChevronRight className="w-5 h-5" />
                       ڤەگەڕە بۆ سوورەتان
@@ -1289,14 +1430,16 @@ export default function App() {
 
                 <div className="p-4 md:p-8 space-y-8">
                   {verses.map((verse) => (
-                    <div key={verse.id} className="border-b border-slate-100 pb-8 last:border-0">
+                    <div key={verse.id} className={`border-b pb-8 last:border-0 ${isDarkMode ? 'border-slate-700' : 'border-slate-100'}`}>
                       <div className="flex flex-wrap gap-y-6 gap-x-3 justify-start mb-6 text-right leading-loose" dir="rtl">
                         {verse.words?.map((word: any) => (
                           <button
                             key={word.id}
                             onClick={() => word.audio_url && playAudio(word.audio_url, 'word', word.id)}
                             className={`relative group rounded-lg px-2 py-1 transition-colors ${
-                              playingWordId === word.id ? 'bg-emerald-100 text-emerald-700' : 'hover:bg-slate-100'
+                              playingWordId === word.id 
+                                ? (isDarkMode ? 'bg-emerald-900/40 text-emerald-400' : 'bg-emerald-100 text-emerald-700') 
+                                : (isDarkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-100')
                             }`}
                           >
                             {word.char_type_name === 'end' ? (
@@ -1305,8 +1448,8 @@ export default function App() {
                               </span>
                             ) : (
                               <span 
-                                className={`text-2xl md:text-3xl leading-loose quran-text ${!showTajweed ? 'no-tajweed-colors' : ''}`} 
-                                style={{ fontFamily: selectedFont }}
+                                className={`leading-loose quran-text ${!showTajweed ? 'no-tajweed-colors' : ''} ${isDarkMode ? 'dark-mode-text' : ''}`} 
+                                style={{ fontFamily: selectedFont, fontSize: `${fontSize}px` }}
                                 dangerouslySetInnerHTML={{ __html: cleanTajweed(word.text_uthmani_tajweed || word.text_uthmani) }}
                               />
                             )}
@@ -1319,13 +1462,15 @@ export default function App() {
                         ))}
                       </div>
                       
-                      <div className="flex flex-wrap items-center gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                      <div className={`flex flex-wrap items-center gap-3 p-3 rounded-2xl border transition-colors ${
+                        isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-100'
+                      }`}>
                         <button
                           onClick={() => playAudio(verse.audio?.url, 'verse', verse.verse_key)}
                           className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors ${
                             playingVerseKey === verse.verse_key 
                               ? 'bg-emerald-600 text-white shadow-sm' 
-                              : 'bg-white border border-slate-200 text-slate-700 hover:border-emerald-400 hover:text-emerald-600'
+                              : (isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:border-emerald-500' : 'bg-white border border-slate-200 text-slate-700 hover:border-emerald-400 hover:text-emerald-600')
                           }`}
                         >
                           {playingVerseKey === verse.verse_key ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
@@ -1335,7 +1480,9 @@ export default function App() {
                         <button
                           onClick={() => handleGetTafsir(verse.verse_key, verse.words)}
                           disabled={isLoadingTafsir[verse.verse_key]}
-                          className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl hover:border-blue-400 hover:text-blue-600 text-slate-700 font-medium transition-colors disabled:opacity-50"
+                          className={`flex items-center gap-2 px-4 py-2 border rounded-xl font-medium transition-colors disabled:opacity-50 ${
+                            isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:border-blue-500' : 'bg-white border border-slate-200 text-slate-700 hover:border-blue-400 hover:text-blue-600'
+                          }`}
                         >
                           {isLoadingTafsir[verse.verse_key] ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
                           تەفسیرا بادینی
@@ -1344,7 +1491,9 @@ export default function App() {
                         <button
                           onClick={() => handleGenerateImage(verse.verse_key, verse.words)}
                           disabled={isGeneratingImage[verse.verse_key]}
-                          className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl hover:border-purple-400 hover:text-purple-600 text-slate-700 font-medium transition-colors disabled:opacity-50"
+                          className={`flex items-center gap-2 px-4 py-2 border rounded-xl font-medium transition-colors disabled:opacity-50 ${
+                            isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:border-purple-500' : 'bg-white border border-slate-200 text-slate-700 hover:border-purple-400 hover:text-purple-600'
+                          }`}
                         >
                           {isGeneratingImage[verse.verse_key] ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
                           تەفسیر ب وێنە
@@ -1352,8 +1501,10 @@ export default function App() {
                       </div>
 
                       {tafsirData[verse.verse_key] && (
-                        <div className="mt-4 p-5 bg-blue-50/50 border border-blue-100 rounded-2xl text-slate-700 leading-relaxed text-lg font-kurdish">
-                          <h4 className="font-bold text-blue-800 mb-2 flex items-center gap-2">
+                        <div className={`mt-4 p-5 border rounded-2xl leading-relaxed text-lg font-kurdish transition-colors ${
+                          isDarkMode ? 'bg-blue-900/10 border-blue-900/30 text-slate-300' : 'bg-blue-50/50 border-blue-100 text-slate-700'
+                        }`}>
+                          <h4 className={`font-bold mb-2 flex items-center gap-2 ${isDarkMode ? 'text-blue-400' : 'text-blue-800'}`}>
                             <BookOpen className="w-4 h-4" />
                             تەفسیرا ئایەتێ:
                           </h4>
@@ -1362,8 +1513,10 @@ export default function App() {
                       )}
                       
                       {generatedImages[verse.verse_key] && (
-                        <div className="mt-4 p-5 bg-purple-50/50 border border-purple-100 rounded-2xl flex flex-col items-center">
-                          <h4 className="font-bold text-purple-800 mb-4 flex items-center gap-2 self-start font-kurdish">
+                        <div className={`mt-4 p-5 border rounded-2xl flex flex-col items-center transition-colors ${
+                          isDarkMode ? 'bg-purple-900/10 border-purple-900/30' : 'bg-purple-50/50 border-purple-100'
+                        }`}>
+                          <h4 className={`font-bold mb-4 flex items-center gap-2 self-start font-kurdish ${isDarkMode ? 'text-purple-400' : 'text-purple-800'}`}>
                             <ImageIcon className="w-4 h-4" />
                             وێنەیێ تەفسیرێ:
                           </h4>
@@ -1383,7 +1536,9 @@ export default function App() {
                       <button
                         onClick={() => loadSurah(selectedSurahObj, quranPage + 1, true)}
                         disabled={isLoadingQuran}
-                        className="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-8 py-3 rounded-xl font-medium transition-colors disabled:opacity-50 flex items-center gap-2 mx-auto"
+                        className={`px-8 py-3 rounded-xl font-medium transition-colors disabled:opacity-50 flex items-center gap-2 mx-auto ${
+                          isDarkMode ? 'bg-emerald-900/40 text-emerald-400 hover:bg-emerald-900/60' : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800'
+                        }`}
                       >
                         {isLoadingQuran ? <Loader2 className="w-5 h-5 animate-spin" /> : 'ئایەتێن زێدەتر نیشان بدە'}
                       </button>
@@ -1399,9 +1554,9 @@ export default function App() {
         {activeTab === 'continuous' && (
           <div className="space-y-6 pb-32">
             {!continuousSurahObj ? (
-              <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden p-6 md:p-8">
+              <div className={`${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200/60'} rounded-3xl shadow-sm border overflow-hidden p-6 md:p-8 transition-colors`}>
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-slate-800">خوێندنا بەردەوام</h2>
+                  <h2 className={`text-2xl font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>خوێندنا بەردەوام</h2>
                   {isLoadingContinuous && <Loader2 className="w-5 h-5 animate-spin text-emerald-600" />}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -1409,13 +1564,19 @@ export default function App() {
                     <button
                       key={surah.id}
                       onClick={() => loadContinuousSurah(surah)}
-                      className="p-4 rounded-2xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 text-slate-700 transition-all flex items-center justify-between group text-right"
+                      className={`p-4 rounded-2xl border transition-all flex items-center justify-between group text-right ${
+                        isDarkMode 
+                          ? 'border-slate-700 hover:border-emerald-500 hover:bg-emerald-900/20 text-slate-300' 
+                          : 'border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 text-slate-700'
+                      }`}
                     >
                       <div>
-                        <span className="block font-bold text-lg text-emerald-800 group-hover:text-emerald-600">{surah.name_arabic}</span>
+                        <span className={`block font-bold text-lg group-hover:text-emerald-500 ${isDarkMode ? 'text-emerald-400' : 'text-emerald-800'}`}>{surah.name_arabic}</span>
                         <span className="text-xs text-slate-400">{surah.verses_count} ئایەت</span>
                       </div>
-                      <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 group-hover:bg-emerald-200 group-hover:text-emerald-700 font-medium text-sm">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-medium text-sm transition-colors ${
+                        isDarkMode ? 'bg-slate-900 text-slate-500 group-hover:bg-emerald-900 group-hover:text-emerald-400' : 'bg-slate-100 text-slate-500 group-hover:bg-emerald-200 group-hover:text-emerald-700'
+                      }`}>
                         {surah.id}
                       </div>
                     </button>
@@ -1423,17 +1584,19 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden">
-                <div className="p-6 md:p-8 border-b border-slate-100 bg-emerald-50/50 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sticky top-0 z-10 backdrop-blur-md">
+              <div className={`${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200/60'} rounded-3xl shadow-sm border overflow-hidden transition-colors`}>
+                <div className={`p-6 md:p-8 border-b flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sticky top-0 z-10 backdrop-blur-md transition-colors ${
+                  isDarkMode ? 'border-slate-700 bg-slate-800/80' : 'border-slate-100 bg-emerald-50/50'
+                }`}>
                   <div>
-                    <h2 className="text-3xl font-bold text-emerald-900 font-serif">{continuousSurahObj.name_arabic}</h2>
-                    <p className="text-emerald-700 mt-1">سورة {continuousSurahObj.name_arabic} - {continuousSurahObj.verses_count} ئایەت</p>
+                    <h2 className={`text-3xl font-bold font-serif ${isDarkMode ? 'text-emerald-400' : 'text-emerald-900'}`}>{continuousSurahObj.name_arabic}</h2>
+                    <p className={`${isDarkMode ? 'text-emerald-500' : 'text-emerald-700'} mt-1`}>سورة {continuousSurahObj.name_arabic} - {continuousSurahObj.verses_count} ئایەت</p>
                   </div>
                   <button onClick={() => {
                     setContinuousSurahObj(null);
                     setIsContinuousAudioPlaying(false);
                     setIsAutoScrolling(false);
-                  }} className="text-emerald-600 hover:text-emerald-800 font-medium">
+                  }} className={`${isDarkMode ? 'text-emerald-400 hover:text-emerald-300' : 'text-emerald-600 hover:text-emerald-800'} font-medium`}>
                     ڤەگەڕە بۆ لیستا سوورەتان
                   </button>
                 </div>
@@ -1451,7 +1614,11 @@ export default function App() {
                           setContinuousVerseIndex(index);
                           setIsContinuousAudioPlaying(true);
                         }}
-                        className={`transition-all duration-500 rounded-2xl p-6 cursor-pointer hover:bg-slate-50 border border-transparent ${index === continuousVerseIndex && isContinuousAudioPlaying ? 'bg-emerald-50/80 border-emerald-200 shadow-sm scale-[1.01]' : ''}`}
+                        className={`transition-all duration-500 rounded-2xl p-6 cursor-pointer border ${
+                          index === continuousVerseIndex && isContinuousAudioPlaying 
+                            ? (isDarkMode ? 'bg-emerald-900/30 border-emerald-800 shadow-sm scale-[1.01]' : 'bg-emerald-50/80 border-emerald-200 shadow-sm scale-[1.01]') 
+                            : (isDarkMode ? 'hover:bg-slate-700 border-transparent' : 'hover:bg-slate-50 border-transparent')
+                        }`}
                       >
                         <div className="flex flex-wrap gap-y-6 gap-x-3 justify-start mb-2 text-right leading-loose" dir="rtl">
                           {verse.words?.map((word: any) => (
@@ -1462,7 +1629,9 @@ export default function App() {
                                 if (word.audio_url) playAudio(word.audio_url, 'word', word.id);
                               }}
                               className={`relative group rounded-lg px-2 py-1 transition-colors ${
-                                playingWordId === word.id ? 'bg-emerald-100 text-emerald-700' : 'hover:bg-emerald-100/50'
+                                playingWordId === word.id 
+                                  ? (isDarkMode ? 'bg-emerald-900/40 text-emerald-400' : 'bg-emerald-100 text-emerald-700') 
+                                  : (isDarkMode ? 'hover:bg-emerald-900/20' : 'hover:bg-emerald-100/50')
                               }`}
                             >
                               {word.char_type_name === 'end' ? (
@@ -1471,8 +1640,8 @@ export default function App() {
                                 </span>
                               ) : (
                                 <span 
-                                  className={`text-2xl md:text-3xl leading-loose quran-text ${!showTajweed ? 'no-tajweed-colors' : ''}`} 
-                                  style={{ fontFamily: selectedFont }}
+                                  className={`leading-loose quran-text ${!showTajweed ? 'no-tajweed-colors' : ''} ${isDarkMode ? 'dark-mode-text' : ''}`} 
+                                  style={{ fontFamily: selectedFont, fontSize: `${fontSize}px` }}
                                   dangerouslySetInnerHTML={{ __html: cleanTajweed(word.text_uthmani_tajweed || word.text_uthmani) }}
                                 />
                               )}
@@ -1485,7 +1654,7 @@ export default function App() {
                           ))}
                         </div>
                         <div className="flex justify-end">
-                           <span className="text-[10px] text-slate-400 font-medium">ئایەتا {verse.verse_key}</span>
+                           <span className={`text-[10px] font-medium ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>ئایەتا {verse.verse_key}</span>
                         </div>
                       </div>
                     ))
@@ -1496,7 +1665,9 @@ export default function App() {
 
             {/* Fixed Bottom Control Bar */}
             {continuousSurahObj && (
-              <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-lg border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-50 p-4">
+              <div className={`fixed bottom-0 left-0 right-0 border-t shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-50 p-4 backdrop-blur-lg transition-colors ${
+                isDarkMode ? 'bg-slate-900/90 border-slate-700' : 'bg-white/90 border-slate-200'
+              }`}>
                 <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
                   
                   {/* Audio Controls */}
@@ -1507,31 +1678,37 @@ export default function App() {
                     >
                       {isContinuousAudioPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-1" />}
                     </button>
-                    <div className="text-sm font-medium text-slate-700">
+                    <div className={`text-sm font-medium ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                       {isContinuousAudioPlaying ? 'دەنگ کاردکەت...' : 'دەنگ ڕاوەستیایە'}
                     </div>
                   </div>
 
                   {/* Auto-scroll Controls */}
-                  <div className="flex items-center gap-4 flex-1 max-w-md w-full bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                  <div className={`flex items-center gap-4 flex-1 max-w-md w-full p-3 rounded-2xl border transition-colors ${
+                    isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                  }`}>
                     <button
                       onClick={() => setIsAutoScrolling(!isAutoScrolling)}
-                      className={`px-4 py-2 rounded-xl font-medium text-sm transition-colors whitespace-nowrap ${isAutoScrolling ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-white text-slate-600 border border-slate-300 hover:bg-slate-100'}`}
+                      className={`px-4 py-2 rounded-xl font-medium text-sm transition-colors whitespace-nowrap ${
+                        isAutoScrolling 
+                          ? (isDarkMode ? 'bg-emerald-900/40 text-emerald-400 border-emerald-800' : 'bg-emerald-100 text-emerald-700 border-emerald-200') 
+                          : (isDarkMode ? 'bg-slate-900 text-slate-400 border-slate-700 hover:bg-slate-700' : 'bg-white text-slate-600 border border-slate-300 hover:bg-slate-100')
+                      }`}
                     >
                       {isAutoScrolling ? 'ڕاوەستاندنا لڤینێ' : 'لڤینا خۆکار'}
                     </button>
                     
                     <div className="flex-1 flex items-center gap-3" dir="ltr">
-                      <span className="text-xs text-slate-500 font-medium">Very Slow</span>
+                      <span className={`text-xs font-medium ${isDarkMode ? 'text-slate-500' : 'text-slate-500'}`}>Very Slow</span>
                       <input 
                         type="range" 
                         min="1" 
                         max="50" 
                         value={autoScrollSpeed}
                         onChange={(e) => setAutoScrollSpeed(Number(e.target.value))}
-                        className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+                        className={`flex-1 h-2 rounded-lg appearance-none cursor-pointer accent-emerald-600 ${isDarkMode ? 'bg-slate-700' : 'bg-slate-200'}`}
                       />
-                      <span className="text-xs text-slate-500 font-medium">Fast</span>
+                      <span className={`text-xs font-medium ${isDarkMode ? 'text-slate-500' : 'text-slate-500'}`}>Fast</span>
                     </div>
                   </div>
 

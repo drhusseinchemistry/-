@@ -56,3 +56,16 @@
   color: inherit !important;
   font-weight: inherit !important;
 }
+
+.dark .quran-text:not(.no-tajweed-colors) {
+  color: #e2e8f0; /* text-slate-200 */
+}
+
+.dark .quran-text.no-tajweed-colors {
+  color: #e2e8f0;
+}
+
+.dark .quran-text .slnt,
+.dark .quran-text [class*="slnt"] {
+  color: #64748b; /* Muted gray for dark mode */
+}
