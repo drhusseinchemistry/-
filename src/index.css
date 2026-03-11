@@ -1,23 +1,31 @@
 @import url('https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Scheherazade+New:wght@400;700&family=Lateef:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&family=Amiri:wght@400;700&display=swap');
 @import "tailwindcss";
 
+/* Load Uthmanic Hafs from a reliable CDN */
 @font-face {
-  font-family: 'Uthmanic Hafs';
-  src: url('kfgqpc-uthmanic-script-hafs-regular/arabic.otf') format('opentype');
+  font-family: 'UthmanicHafs';
+  src: url('https://cdn.jsdelivr.net/gh/GuepardoApps/Quran-Fonts@master/UthmanicHafs/UthmanicHafs.woff2') format('woff2'),
+       url('https://cdn.jsdelivr.net/gh/GuepardoApps/Quran-Fonts@master/UthmanicHafs/UthmanicHafs.woff') format('woff');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
 }
 
 @theme {
-  --font-quran: "Uthmanic Hafs", "Amiri Quran", serif;
+  --font-quran: "UthmanicHafs", "KFGQPC Uthmanic Script HAFS", "Amiri Quran", serif;
   --font-kurdish: "Noto Sans Arabic", sans-serif;
 }
 
 .quran-text {
   /* Default font, can be overridden by inline styles */
-  font-family: 'Uthmanic Hafs', 'Amiri Quran', 'Traditional Arabic', serif;
+  font-family: 'UthmanicHafs', 'KFGQPC Uthmanic Script HAFS', 'Amiri Quran', 'Traditional Arabic', serif;
   color: #1e293b; /* text-slate-800 */
+  line-height: 2;
+  text-rendering: optimizeLegibility;
+  font-variant-ligatures: common-ligatures;
+  font-feature-settings: "kern" 1, "liga" 1, "clig" 1;
+  letter-spacing: normal !important;
+  word-spacing: normal !important;
 }
 
 /* Highly Visible Tajweed Colors */
