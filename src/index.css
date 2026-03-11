@@ -1,14 +1,23 @@
 @import url('https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Scheherazade+New:wght@400;700&family=Lateef:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&family=Amiri:wght@400;700&display=swap');
 @import "tailwindcss";
 
+/* Ensure Uthmanic Hafs is mapped to the package font */
+@font-face {
+  font-family: 'Uthmanic Hafs';
+  src: local('KFGQPC Uthmanic Script HAFS Regular'),
+       local('KFGQPC Uthmanic Script HAFS'),
+       local('KFGQPC Uthman Taha Naskh'),
+       local('Uthmanic Hafs');
+}
+
 @theme {
-  --font-quran: "Uthmanic Hafs", "Amiri Quran", serif;
+  --font-quran: "Uthmanic Hafs", "KFGQPC Uthmanic Script HAFS Regular", "Amiri Quran", serif;
   --font-kurdish: "Noto Sans Arabic", sans-serif;
 }
 
 .quran-text {
   /* Default font, can be overridden by inline styles */
-  font-family: 'Uthmanic Hafs', 'Amiri Quran', 'Traditional Arabic', serif;
+  font-family: 'Uthmanic Hafs', 'KFGQPC Uthmanic Script HAFS Regular', 'Amiri Quran', 'Traditional Arabic', serif;
   color: #1e293b; /* text-slate-800 */
 }
 
