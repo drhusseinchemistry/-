@@ -60,8 +60,177 @@ const cleanTajweed = (text: string) => {
   return text;
 };
 
+import { surahs as surahList } from './constants';
+
+function MushafView({ page, setPage }: { page: number, setPage: (p: number) => void }) {
+  const [showSurahList, setShowSurahList] = useState(false);
+  const [jumpPage, setJumpPage] = useState(page.toString());
+  const [isImageLoading, setIsImageLoading] = useState(true);
+
+  const nextPage = () => {
+    if (page < 604) {
+      setIsImageLoading(true);
+      setPage(page + 1);
+      setJumpPage((page + 1).toString());
+    }
+  };
+  const prevPage = () => {
+    if (page > 1) {
+      setIsImageLoading(true);
+      setPage(page - 1);
+      setJumpPage((page - 1).toString());
+    }
+  };
+
+  const handleJump = (e: React.FormEvent) => {
+    e.preventDefault();
+    const p = parseInt(jumpPage);
+    if (p >= 1 && p <= 604) {
+      setIsImageLoading(true);
+      setPage(p);
+    }
+  };
+
+  const getSurahForPage = (p: number) => {
+    return [...surahList].reverse().find(s => s.startPage <= p) || surahList[0];
+  };
+
+  const currentSurah = getSurahForPage(page);
+
+  return (
+    <div className="flex flex-col items-center w-full max-w-4xl mx-auto p-2 sm:p-4 space-y-4">
+      {/* Header Controls */}
+      <div className="flex items-center justify-between w-full bg-white dark:bg-zinc-900 p-3 sm:p-4 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-800 sticky top-0 z-20">
+        <div className="flex items-center gap-2 sm:gap-4">
+          <button 
+            onClick={() => setShowSurahList(!showSurahList)}
+            className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors"
+            title="لیستا سورەتان"
+          >
+            <ListIcon className="w-6 h-6 text-emerald-600" />
+          </button>
+          <div className="flex flex-col">
+            <span className="text-base sm:text-lg font-bold text-zinc-900 dark:text-zinc-100 leading-tight">{currentSurah.name}</span>
+            <span className="text-[10px] sm:text-xs text-zinc-500">{currentSurah.englishName}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <form onSubmit={handleJump} className="flex items-center gap-1 sm:gap-2">
+            <input 
+              type="number"
+              value={jumpPage}
+              onChange={(e) => setJumpPage(e.target.value)}
+              className="w-12 sm:w-16 p-1.5 sm:p-2 text-center bg-zinc-100 dark:bg-zinc-800 rounded-xl border-none focus:ring-2 focus:ring-emerald-500 text-sm sm:text-base"
+              min="1"
+              max="604"
+            />
+            <span className="text-zinc-400 text-xs sm:text-sm">/ 604</span>
+          </form>
+        </div>
+      </div>
+
+      {/* Surah Selection Modal/Dropdown */}
+      {showSurahList && (
+        <div className="w-full bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden max-h-[60vh] overflow-y-auto animate-in fade-in slide-in-from-top-4 duration-200">
+          <div className="sticky top-0 bg-white dark:bg-zinc-900 p-4 border-b border-zinc-100 dark:border-zinc-800 z-10 flex justify-between items-center">
+            <h3 className="font-bold text-zinc-900 dark:text-zinc-100">لیستا سورەتان</h3>
+            <button onClick={() => setShowSurahList(false)} className="text-zinc-400 hover:text-zinc-600">
+              <Plus className="w-5 h-5 rotate-45" />
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1 p-2">
+            {surahList.map(s => (
+              <button
+                key={s.id}
+                onClick={() => {
+                  setIsImageLoading(true);
+                  setPage(s.startPage);
+                  setJumpPage(s.startPage.toString());
+                  setShowSurahList(false);
+                }}
+                className={`flex items-center justify-between p-3 rounded-xl transition-colors ${
+                  currentSurah.id === s.id 
+                    ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600' 
+                    : 'hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] w-5 h-5 flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-full opacity-70">{s.id}</span>
+                  <span className="font-medium text-sm sm:text-base">{s.name}</span>
+                </div>
+                <span className="text-[10px] opacity-50">ل. {s.startPage}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Page Viewer */}
+      <div className="relative w-full aspect-[3/4.5] sm:aspect-[3/4] bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 group select-none">
+        {isImageLoading && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-50 dark:bg-zinc-900 z-10">
+            <Loader2 className="w-10 h-10 text-emerald-600 animate-spin mb-2" />
+            <span className="text-xs text-zinc-400 animate-pulse">لاپەڕە دهێتە بارکرن...</span>
+          </div>
+        )}
+        
+        <img 
+          key={page}
+          src={`https://everyayah.com/data/quran_pages_v2/${page.toString().padStart(3, '0')}.png`}
+          alt={`Quran Page ${page}`}
+          onLoad={() => setIsImageLoading(false)}
+          className={`w-full h-full object-contain transition-opacity duration-300 ${isImageLoading ? 'opacity-0' : 'opacity-100'}`}
+          referrerPolicy="no-referrer"
+        />
+        
+        {/* Navigation Overlays (Invisible clickable areas) */}
+        <div className="absolute inset-0 flex">
+          <button 
+            onClick={prevPage}
+            className="w-1/2 h-full cursor-w-resize"
+            title="لاپەڕێ پێشتر"
+          />
+          <button 
+            onClick={nextPage}
+            className="w-1/2 h-full cursor-e-resize"
+            title="لاپەڕێ پاشتر"
+          />
+        </div>
+
+        {/* Floating Controls (Visible on hover or touch) */}
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+          <button 
+            onClick={prevPage}
+            disabled={page === 1}
+            className="p-3 bg-white/90 dark:bg-zinc-900/90 backdrop-blur shadow-lg rounded-full hover:scale-110 transition-transform disabled:opacity-50 text-emerald-600"
+          >
+            <ChevronRight className="w-6 h-6 rotate-180" />
+          </button>
+          <div className="px-6 py-2 bg-white/90 dark:bg-zinc-900/90 backdrop-blur shadow-lg rounded-full font-bold text-emerald-600 min-w-[80px] text-center">
+            {page}
+          </div>
+          <button 
+            onClick={nextPage}
+            disabled={page === 604}
+            className="p-3 bg-white/90 dark:bg-zinc-900/90 backdrop-blur shadow-lg rounded-full hover:scale-110 transition-transform disabled:opacity-50 text-emerald-600"
+          >
+            <ChevronRight className="w-6 h-6" />
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-col items-center gap-2 text-[10px] sm:text-xs text-zinc-400 text-center px-4">
+        <p>بۆ لاپەڕێ دی: لایێ چەپێ یان ڕاستێ یێ وێنەیی کلیک بکە</p>
+        <p className="opacity-50">قورئانا مەدینێ - ٦٠٤ لاپەڕە</p>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'dictionary' | 'list' | 'quran' | 'adhkar'>('quran');
+  const [activeTab, setActiveTab] = useState<'dictionary' | 'list' | 'quran' | 'adhkar' | 'mushaf'>('mushaf');
+  const [mushafPage, setMushafPage] = useState(54); // Default to page 54 as in the image
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResult, setSearchResult] = useState<{ word: string; meaning: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -961,6 +1130,17 @@ export default function App() {
           isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200/60'
         }`}>
           <button
+            onClick={() => { setActiveTab('mushaf'); setError(''); }}
+            className={`px-5 py-2.5 rounded-xl text-base font-medium flex items-center gap-2 transition-all whitespace-nowrap ${
+              activeTab === 'mushaf'
+                ? (isDarkMode ? 'bg-emerald-600 text-white shadow-md' : 'bg-emerald-100/80 text-emerald-800 shadow-sm')
+                : (isDarkMode ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50')
+            }`}
+          >
+            <BookOpen className="w-4 h-4" />
+            قورئان (لاپەڕ)
+          </button>
+          <button
             onClick={() => { setActiveTab('quran'); setError(''); }}
             className={`px-5 py-2.5 rounded-xl text-base font-medium flex items-center gap-2 transition-all whitespace-nowrap ${
               activeTab === 'quran'
@@ -1126,6 +1306,7 @@ export default function App() {
         )}
 
         {/* Dictionary Tab */}
+        {activeTab === 'mushaf' && <MushafView page={mushafPage} setPage={setMushafPage} />}
         {activeTab === 'dictionary' && (
           <div className={`${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200/60'} p-6 md:p-8 rounded-3xl shadow-sm border transition-colors`}>
             <form onSubmit={handleSearch} className="max-w-2xl mx-auto mb-8">
