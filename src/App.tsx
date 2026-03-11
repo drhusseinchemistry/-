@@ -84,7 +84,7 @@ export default function App() {
   const [isGeneratingImage, setIsGeneratingImage] = useState<Record<string, boolean>>({});
   
   // Font State
-  const [selectedFont, setSelectedFont] = useState<string>('Amiri Quran');
+  const [selectedFont, setSelectedFont] = useState<string>('Uthmanic Hafs');
   const [customFonts, setCustomFonts] = useState<{name: string, url: string}[]>([]);
   const [showTajweed, setShowTajweed] = useState<boolean>(true);
   
@@ -1050,6 +1050,7 @@ export default function App() {
                   onChange={(e) => setSelectedFont(e.target.value)}
                   className="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 text-sm outline-none focus:border-emerald-500"
                 >
+                  <option value="Uthmanic Hafs">Uthman Taha Naskh (Hafs)</option>
                   <option value="Amiri Quran">Amiri Quran</option>
                   <option value="Traditional Arabic">Traditional Arabic</option>
                   <option value="Scheherazade New">Scheherazade New</option>
