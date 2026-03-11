@@ -37,3 +37,22 @@
 .quran-text [class*="ikhfa"] { color: #FF7F00; font-weight: bold; }
 .quran-text [class*="idgham"] { color: #9C27B0; font-weight: bold; }
 .quran-text [class*="iqlab"] { color: #00BCD4; font-weight: bold; }
+
+/* Class to disable tajweed colors while keeping the correct text structure */
+.quran-text.no-tajweed-colors [class*="madd"],
+.quran-text.no-tajweed-colors [class*="ghunnah"],
+.quran-text.no-tajweed-colors [class*="slnt"],
+.quran-text.no-tajweed-colors [class*="qalqalah"],
+.quran-text.no-tajweed-colors [class*="ikhfa"],
+.quran-text.no-tajweed-colors [class*="idgham"],
+.quran-text.no-tajweed-colors [class*="iqlab"],
+.quran-text.no-tajweed-colors .madd,
+.quran-text.no-tajweed-colors .ghunnah,
+.quran-text.no-tajweed-colors .slnt,
+.quran-text.no-tajweed-colors .qalqalah,
+.quran-text.no-tajweed-colors .ikhfa,
+.quran-text.no-tajweed-colors .idgham,
+.quran-text.no-tajweed-colors .iqlab {
+  color: inherit !important;
+  font-weight: inherit !important;
+}

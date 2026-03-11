@@ -1142,9 +1142,9 @@ export default function App() {
                               </span>
                             ) : (
                               <span 
-                                className="text-2xl md:text-3xl leading-loose quran-text" 
+                                className={`text-2xl md:text-3xl leading-loose quran-text ${!showTajweed ? 'no-tajweed-colors' : ''}`} 
                                 style={{ fontFamily: selectedFont }}
-                                dangerouslySetInnerHTML={{ __html: cleanTajweed(showTajweed ? (word.text_uthmani_tajweed || word.text_uthmani) : word.text_uthmani) }}
+                                dangerouslySetInnerHTML={{ __html: cleanTajweed(word.text_uthmani_tajweed || word.text_uthmani) }}
                               />
                             )}
                             {word.audio_url && word.char_type_name !== 'end' && (
@@ -1305,9 +1305,9 @@ export default function App() {
                               </span>
                             ) : (
                               <span 
-                                className="text-2xl md:text-3xl leading-loose quran-text" 
+                                className={`text-2xl md:text-3xl leading-loose quran-text ${!showTajweed ? 'no-tajweed-colors' : ''}`} 
                                 style={{ fontFamily: selectedFont }}
-                                dangerouslySetInnerHTML={{ __html: cleanTajweed(showTajweed ? (word.text_uthmani_tajweed || word.text_uthmani) : word.text_uthmani) }}
+                                dangerouslySetInnerHTML={{ __html: cleanTajweed(word.text_uthmani_tajweed || word.text_uthmani) }}
                               />
                             )}
                             {word.audio_url && word.char_type_name !== 'end' && (
@@ -1471,9 +1471,9 @@ export default function App() {
                                 </span>
                               ) : (
                                 <span 
-                                  className="text-2xl md:text-3xl leading-loose quran-text" 
+                                  className={`text-2xl md:text-3xl leading-loose quran-text ${!showTajweed ? 'no-tajweed-colors' : ''}`} 
                                   style={{ fontFamily: selectedFont }}
-                                  dangerouslySetInnerHTML={{ __html: cleanTajweed(showTajweed ? (word.text_uthmani_tajweed || word.text_uthmani) : word.text_uthmani) }}
+                                  dangerouslySetInnerHTML={{ __html: cleanTajweed(word.text_uthmani_tajweed || word.text_uthmani) }}
                                 />
                               )}
                               {word.audio_url && word.char_type_name !== 'end' && (
