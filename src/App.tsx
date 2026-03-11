@@ -86,8 +86,7 @@ export default function App() {
   // Font State
   const [selectedFont, setSelectedFont] = useState<string>('Uthmanic Hafs');
   const [customFonts, setCustomFonts] = useState<{name: string, url: string}[]>([]);
-  const [showTajweed, setShowTajweed] = useState<boolean>(false);
-  const [fontSize, setFontSize] = useState<number>(32);
+  const [showTajweed, setShowTajweed] = useState<boolean>(true);
   
   // Quran Search State
   const [quranSearchQuery, setQuranSearchQuery] = useState('');
@@ -1143,8 +1142,8 @@ export default function App() {
                               </span>
                             ) : (
                               <span 
-                                className={`leading-loose quran-text ${!showTajweed ? 'no-tajweed-colors' : ''}`} 
-                                style={{ fontFamily: selectedFont, fontSize: `${fontSize}px` }}
+                                className={`text-2xl md:text-3xl leading-loose quran-text ${!showTajweed ? 'no-tajweed-colors' : ''}`} 
+                                style={{ fontFamily: selectedFont }}
                                 dangerouslySetInnerHTML={{ __html: cleanTajweed(word.text_uthmani_tajweed || word.text_uthmani) }}
                               />
                             )}
@@ -1249,7 +1248,7 @@ export default function App() {
             )}
             
             {selectedSurahObj && (
-              <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden pb-24">
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden">
                 <div className="p-6 md:p-8 border-b border-slate-100 bg-emerald-50/50 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sticky top-0 z-10 backdrop-blur-md">
                   <div>
                     <h2 className="text-3xl font-bold text-emerald-900 font-serif">{selectedSurahObj.name_arabic}</h2>
@@ -1306,8 +1305,8 @@ export default function App() {
                               </span>
                             ) : (
                               <span 
-                                className={`leading-loose quran-text ${!showTajweed ? 'no-tajweed-colors' : ''}`} 
-                                style={{ fontFamily: selectedFont, fontSize: `${fontSize}px` }}
+                                className={`text-2xl md:text-3xl leading-loose quran-text ${!showTajweed ? 'no-tajweed-colors' : ''}`} 
+                                style={{ fontFamily: selectedFont }}
                                 dangerouslySetInnerHTML={{ __html: cleanTajweed(word.text_uthmani_tajweed || word.text_uthmani) }}
                               />
                             )}
@@ -1393,32 +1392,6 @@ export default function App() {
                 </div>
               </div>
             )}
-
-            {/* Fixed Bottom Font Size Bar for Quran Tab */}
-            {(selectedSurahObj || quranSearchResults.length > 0) && (
-              <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-lg border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-50 p-4">
-                <div className="max-w-4xl mx-auto flex items-center gap-6">
-                  <div className="flex items-center gap-3 text-slate-700 font-medium whitespace-nowrap">
-                    <span className="text-sm">حەجمێ نڤیسینێ:</span>
-                  </div>
-                  <div className="flex-1 flex items-center gap-3" dir="ltr">
-                    <span className="text-xs text-slate-500 font-medium">بچیک</span>
-                    <input 
-                      type="range" 
-                      min="20" 
-                      max="80" 
-                      value={fontSize}
-                      onChange={(e) => setFontSize(Number(e.target.value))}
-                      className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
-                    />
-                    <span className="text-xs text-slate-500 font-medium">مەزن</span>
-                  </div>
-                  <div className="bg-emerald-50 px-3 py-1 rounded-lg text-emerald-700 font-bold text-sm">
-                    {fontSize}px
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         )}
 
@@ -1498,8 +1471,8 @@ export default function App() {
                                 </span>
                               ) : (
                                 <span 
-                                  className={`leading-loose quran-text ${!showTajweed ? 'no-tajweed-colors' : ''}`} 
-                                  style={{ fontFamily: selectedFont, fontSize: `${fontSize}px` }}
+                                  className={`text-2xl md:text-3xl leading-loose quran-text ${!showTajweed ? 'no-tajweed-colors' : ''}`} 
+                                  style={{ fontFamily: selectedFont }}
                                   dangerouslySetInnerHTML={{ __html: cleanTajweed(word.text_uthmani_tajweed || word.text_uthmani) }}
                                 />
                               )}
@@ -1536,21 +1509,6 @@ export default function App() {
                     </button>
                     <div className="text-sm font-medium text-slate-700">
                       {isContinuousAudioPlaying ? 'دەنگ کاردکەت...' : 'دەنگ ڕاوەستیایە'}
-                    </div>
-                  </div>
-
-                  {/* Font Size Control */}
-                  <div className="flex items-center gap-4 flex-1 max-w-xs w-full bg-emerald-50 p-3 rounded-2xl border border-emerald-100">
-                    <span className="text-xs text-emerald-700 font-bold whitespace-nowrap">حەجم:</span>
-                    <div className="flex-1 flex items-center gap-2" dir="ltr">
-                      <input 
-                        type="range" 
-                        min="20" 
-                        max="80" 
-                        value={fontSize}
-                        onChange={(e) => setFontSize(Number(e.target.value))}
-                        className="flex-1 h-1.5 bg-emerald-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
-                      />
                     </div>
                   </div>
 
