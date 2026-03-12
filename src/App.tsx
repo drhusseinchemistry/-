@@ -67,12 +67,14 @@ function MushafView({ page, setPage, fontSize }: { page: number, setPage: (p: nu
   const [jumpPage, setJumpPage] = useState(page.toString());
   const [isLoading, setIsLoading] = useState(true);
   const [verses, setVerses] = useState<any[]>([]);
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const audioRef = React.useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     const fetchPageVerses = async () => {
       setIsLoading(true);
       try {
-        const res = await fetch(`https://api.quran.com/api/v4/verses/by_page/${page}?language=ar&words=true&word_fields=text_uthmani`);
+        const res = await fetch(`https://api.quran.com/api/v4/verses/by_page/${page}?language=ar&words=true&word_fields=text_uthmani,audio_url`);
         const data = await res.json();
         setVerses(data.verses);
       } catch (err) {
@@ -84,25 +86,32 @@ function MushafView({ page, setPage, fontSize }: { page: number, setPage: (p: nu
     fetchPageVerses();
   }, [page]);
 
-  const nextPage = () => {
-    if (page < 604) {
-      setPage(page + 1);
-      setJumpPage((page + 1).toString());
+  const playAudio = (url: string | undefined, id: string) => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      if (playingId === id) {
+        setPlayingId(null);
+        return;
+      }
     }
+    if (!url) return;
+    
+    const fullUrl = url.startsWith('http') ? url : `https://audio.qurancdn.com/${url}`;
+    const audio = new Audio(fullUrl);
+    audio.onplay = () => setPlayingId(id);
+    audio.onended = () => { setPlayingId(null); audioRef.current = null; };
+    audio.onerror = () => { setPlayingId(null); audioRef.current = null; };
+    audio.play();
+    audioRef.current = audio;
   };
-  const prevPage = () => {
-    if (page > 1) {
-      setPage(page - 1);
-      setJumpPage((page - 1).toString());
-    }
-  };
+
+  const nextPage = () => { if (page < 604) { setPage(page + 1); setJumpPage((page + 1).toString()); } };
+  const prevPage = () => { if (page > 1) { setPage(page - 1); setJumpPage((page - 1).toString()); } };
 
   const handleJump = (e: React.FormEvent) => {
     e.preventDefault();
     const p = parseInt(jumpPage);
-    if (p >= 1 && p <= 604) {
-      setPage(p);
-    }
+    if (p >= 1 && p <= 604) setPage(p);
   };
 
   const getSurahForPage = (p: number) => {
@@ -190,11 +199,22 @@ function MushafView({ page, setPage, fontSize }: { page: number, setPage: (p: nu
         
         <div className="text-right leading-[2.5] sm:leading-[3] text-zinc-900 dark:text-zinc-100" style={{ fontFamily: 'Uthmanic Hafs', fontSize: `${fontSize}px` }}>
           {verses.map(verse => (
-            <span key={verse.id} className="inline-block">
-              {verse.words.map((word: any) => word.text_uthmani).join(' ')}
-              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-500 text-[10px] mx-2">
+            <span key={verse.id} className="inline-block relative group/verse">
+              {verse.words.map((word: any) => (
+                <button 
+                  key={word.id}
+                  onClick={() => playAudio(word.audio_url, `word-${word.id}`)}
+                  className={`inline-block px-0.5 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded transition-colors ${playingId === `word-${word.id}` ? 'bg-emerald-200 dark:bg-emerald-800' : ''}`}
+                >
+                  {word.text_uthmani}
+                </button>
+              ))}
+              <button 
+                onClick={() => playAudio(verse.audio_url, `verse-${verse.id}`)}
+                className={`inline-flex items-center justify-center w-6 h-6 rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-500 text-[10px] mx-2 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 ${playingId === `verse-${verse.id}` ? 'bg-emerald-200 dark:bg-emerald-800' : ''}`}
+              >
                 {verse.verse_key.split(':')[1]}
-              </span>
+              </button>
             </span>
           ))}
         </div>
