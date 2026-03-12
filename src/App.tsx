@@ -62,21 +62,36 @@ const cleanTajweed = (text: string) => {
 
 import { surahs as surahList } from './constants';
 
-function MushafView({ page, setPage }: { page: number, setPage: (p: number) => void }) {
+function MushafView({ page, setPage, fontSize }: { page: number, setPage: (p: number) => void, fontSize: number }) {
   const [showSurahList, setShowSurahList] = useState(false);
   const [jumpPage, setJumpPage] = useState(page.toString());
-  const [isImageLoading, setIsImageLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [verses, setVerses] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchPageVerses = async () => {
+      setIsLoading(true);
+      try {
+        const res = await fetch(`https://api.quran.com/api/v4/verses/by_page/${page}?language=ar&words=true&word_fields=text_uthmani`);
+        const data = await res.json();
+        setVerses(data.verses);
+      } catch (err) {
+        console.error("Failed to fetch page verses", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchPageVerses();
+  }, [page]);
 
   const nextPage = () => {
     if (page < 604) {
-      setIsImageLoading(true);
       setPage(page + 1);
       setJumpPage((page + 1).toString());
     }
   };
   const prevPage = () => {
     if (page > 1) {
-      setIsImageLoading(true);
       setPage(page - 1);
       setJumpPage((page - 1).toString());
     }
@@ -86,7 +101,6 @@ function MushafView({ page, setPage }: { page: number, setPage: (p: number) => v
     e.preventDefault();
     const p = parseInt(jumpPage);
     if (p >= 1 && p <= 604) {
-      setIsImageLoading(true);
       setPage(p);
     }
   };
@@ -144,7 +158,6 @@ function MushafView({ page, setPage }: { page: number, setPage: (p: number) => v
               <button
                 key={s.id}
                 onClick={() => {
-                  setIsImageLoading(true);
                   setPage(s.startPage);
                   setJumpPage(s.startPage.toString());
                   setShowSurahList(false);
@@ -166,26 +179,28 @@ function MushafView({ page, setPage }: { page: number, setPage: (p: number) => v
         </div>
       )}
 
-      {/* Page Viewer */}
-      <div className="relative w-full aspect-[3/4.5] sm:aspect-[3/4] bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 group select-none">
-        {isImageLoading && (
+      {/* Page Viewer (Text) */}
+      <div className="relative w-full aspect-[3/4.5] sm:aspect-[3/4] bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 group select-none p-6 sm:p-10 overflow-y-auto">
+        {isLoading && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-50 dark:bg-zinc-900 z-10">
             <Loader2 className="w-10 h-10 text-emerald-600 animate-spin mb-2" />
             <span className="text-xs text-zinc-400 animate-pulse">لاپەڕە دهێتە بارکرن...</span>
           </div>
         )}
         
-        <img 
-          key={page}
-          src={`https://everyayah.com/data/quran_pages_v2/${page.toString().padStart(3, '0')}.png`}
-          alt={`Quran Page ${page}`}
-          onLoad={() => setIsImageLoading(false)}
-          className={`w-full h-full object-contain transition-opacity duration-300 ${isImageLoading ? 'opacity-0' : 'opacity-100'}`}
-          referrerPolicy="no-referrer"
-        />
+        <div className="text-right leading-[2.5] sm:leading-[3] text-zinc-900 dark:text-zinc-100" style={{ fontFamily: 'Uthmanic Hafs', fontSize: `${fontSize}px` }}>
+          {verses.map(verse => (
+            <span key={verse.id} className="inline-block">
+              {verse.words.map((word: any) => word.text_uthmani).join(' ')}
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-500 text-[10px] mx-2">
+                {verse.verse_key.split(':')[1]}
+              </span>
+            </span>
+          ))}
+        </div>
         
         {/* Navigation Overlays (Invisible clickable areas) */}
-        <div className="absolute inset-0 flex">
+        <div className="absolute inset-0 flex z-10">
           <button 
             onClick={prevPage}
             className="w-1/2 h-full cursor-w-resize"
@@ -221,8 +236,8 @@ function MushafView({ page, setPage }: { page: number, setPage: (p: number) => v
       </div>
 
       <div className="flex flex-col items-center gap-2 text-[10px] sm:text-xs text-zinc-400 text-center px-4">
-        <p>بۆ لاپەڕێ دی: لایێ چەپێ یان ڕاستێ یێ وێنەیی کلیک بکە</p>
-        <p className="opacity-50">قورئانا مەدینێ - ٦٠٤ لاپەڕە</p>
+        <p>بۆ لاپەڕێ دی: لایێ چەپێ یان ڕاستێ یێ لاپەڕەی کلیک بکە</p>
+        <p className="opacity-50">قورئانا پیرۆز - ٦٠٤ لاپەڕە</p>
       </div>
     </div>
   );
@@ -1306,7 +1321,7 @@ export default function App() {
         )}
 
         {/* Dictionary Tab */}
-        {activeTab === 'mushaf' && <MushafView page={mushafPage} setPage={setMushafPage} />}
+        {activeTab === 'mushaf' && <MushafView page={mushafPage} setPage={setMushafPage} fontSize={fontSize} />}
         {activeTab === 'dictionary' && (
           <div className={`${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200/60'} p-6 md:p-8 rounded-3xl shadow-sm border transition-colors`}>
             <form onSubmit={handleSearch} className="max-w-2xl mx-auto mb-8">
