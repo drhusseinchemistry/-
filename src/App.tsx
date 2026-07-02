@@ -57,12 +57,36 @@ const commonWords = [
 
 const cleanTajweed = (text: string) => {
   if (!text) return '';
-  return text;
+  // Remove black circle (U+25CF)
+  return text.replace(/\u25CF/g, '');
+};
+
+const getCorrectWordAudioUrl = (word: any, wordsList: any[], verseKey: string): string => {
+  if (!word || !wordsList || !verseKey) return word?.audio_url || '';
+  
+  // Parse surah and verse
+  const [surahStr, verseStr] = verseKey.split(':');
+  const surahNum = parseInt(surahStr);
+  const verseNum = parseInt(verseStr);
+  if (isNaN(surahNum) || isNaN(verseNum)) return word.audio_url || '';
+  
+  // Filter words that are actual spoken words
+  const spokenWords = wordsList.filter((w: any) => w.char_type_name === 'word');
+  const wordIndex = spokenWords.findIndex((w: any) => w.id === word.id);
+  
+  if (wordIndex === -1) {
+    return word.audio_url || '';
+  }
+  
+  const spokenWordNum = wordIndex + 1;
+  const pad3 = (num: number) => String(num).padStart(3, '0');
+  
+  return `wbw/${pad3(surahNum)}_${pad3(verseNum)}_${pad3(spokenWordNum)}.mp3`;
 };
 
 import { surahs as surahList } from './constants';
 
-function MushafView({ page, setPage, fontSize }: { page: number, setPage: (p: number) => void, fontSize: number }) {
+function MushafView({ page, setPage, fontSize, selectedFont, showTajweed }: { page: number, setPage: (p: number) => void, fontSize: number, selectedFont: string, showTajweed: boolean }) {
   const [showSurahList, setShowSurahList] = useState(false);
   const [jumpPage, setJumpPage] = useState(page.toString());
   const [isLoading, setIsLoading] = useState(true);
@@ -74,7 +98,7 @@ function MushafView({ page, setPage, fontSize }: { page: number, setPage: (p: nu
     const fetchPageVerses = async () => {
       setIsLoading(true);
       try {
-        const res = await fetch(`https://api.quran.com/api/v4/verses/by_page/${page}?language=ar&words=true&word_fields=text_uthmani,audio_url`);
+        const res = await fetch(`https://api.quran.com/api/v4/verses/by_page/${page}?language=ar&words=true&word_fields=text_uthmani,text_uthmani_tajweed,audio_url`);
         const data = await res.json();
         setVerses(data.verses);
       } catch (err) {
@@ -197,21 +221,47 @@ function MushafView({ page, setPage, fontSize }: { page: number, setPage: (p: nu
           </div>
         )}
         
-        <div className="text-right leading-[2.5] sm:leading-[3] text-zinc-900 dark:text-zinc-100" style={{ fontFamily: 'Uthmanic Hafs', fontSize: `${fontSize}px` }}>
+        <div className="text-right leading-[2.5] sm:leading-[3] text-zinc-900 dark:text-zinc-100 quran-text" style={{ fontFamily: selectedFont, fontSize: `${fontSize}px` }}>
           {verses.map(verse => (
             <span key={verse.id} className="inline-block relative group/verse">
-              {verse.words.map((word: any) => (
-                <button 
-                  key={word.id}
-                  onClick={() => playAudio(word.audio_url, `word-${word.id}`)}
-                  className={`inline-block px-0.5 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded transition-colors ${playingId === `word-${word.id}` ? 'bg-emerald-200 dark:bg-emerald-800' : ''}`}
-                >
-                  {word.text_uthmani}
-                </button>
-              ))}
+              {verse.words.map((word: any) => {
+                const hasAudio = !!word.audio_url && 
+                                 word.char_type_name !== 'end' && 
+                                 word.char_type_name !== 'stop' && 
+                                 word.text_uthmani !== 'ۗ' && 
+                                 word.text_uthmani !== 'ۖ' && 
+                                 word.text_uthmani !== 'ج' && 
+                                 word.text_uthmani !== 'ۛ' && 
+                                 word.text_uthmani !== 'ۘ' && 
+                                 word.text_uthmani !== 'ۙ' && 
+                                 word.text_uthmani !== 'ۚ';
+                const isPlaying = playingId === `word-${word.id}`;
+                return (
+                  <span 
+                    key={word.id} 
+                    onClick={() => {
+                      if (hasAudio) {
+                        const correctUrl = getCorrectWordAudioUrl(word, verse.words, verse.verse_key);
+                        playAudio(correctUrl, `word-${word.id}`);
+                      }
+                    }}
+                    className={`inline px-1 select-none transition-all duration-200 ${
+                      hasAudio 
+                        ? 'cursor-pointer hover:text-emerald-500 hover:bg-emerald-500/10 rounded' 
+                        : ''
+                    } ${
+                      isPlaying 
+                        ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 font-bold border-b-2 border-emerald-500' 
+                        : ''
+                    }`} 
+                    dangerouslySetInnerHTML={{ __html: cleanTajweed(showTajweed ? (word.text_uthmani_tajweed || word.text_uthmani) : word.text_uthmani) }}
+                    title={hasAudio ? "بۆ گوهداریکرنێ کلیک بکە" : undefined}
+                  />
+                );
+              })}
               <button 
                 onClick={() => playAudio(verse.audio_url, `verse-${verse.id}`)}
-                className={`inline-flex items-center justify-center w-6 h-6 rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-500 text-[10px] mx-2 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 ${playingId === `verse-${verse.id}` ? 'bg-emerald-200 dark:bg-emerald-800' : ''}`}
+                className={`inline-flex items-center justify-center mx-2 text-zinc-500 text-sm hover:text-emerald-600 ${playingId === `verse-${verse.id}` ? 'text-emerald-600' : ''}`}
               >
                 {verse.verse_key.split(':')[1]}
               </button>
@@ -341,6 +391,7 @@ export default function App() {
   const [isAutoScrolling, setIsAutoScrolling] = useState(false);
   const [autoScrollSpeed, setAutoScrollSpeed] = useState(5);
   const continuousAudioRef = React.useRef<HTMLAudioElement | null>(null);
+  const nextAudioPreloadRef = React.useRef<HTMLAudioElement | null>(null);
 
   const toggleAdhkarExpansion = (id: string) => {
     const newExpanded = new Set(expandedAdhkarIds);
@@ -597,6 +648,10 @@ export default function App() {
   useEffect(() => {
     if (activeTab !== 'continuous') {
       if (continuousAudioRef.current) continuousAudioRef.current.pause();
+      if (nextAudioPreloadRef.current) {
+        nextAudioPreloadRef.current.pause();
+        nextAudioPreloadRef.current = null;
+      }
       setIsContinuousAudioPlaying(false);
       setIsAutoScrolling(false);
       return;
@@ -617,13 +672,22 @@ export default function App() {
         return;
       }
 
-      const url = verse.audio?.url;
-      if (url) {
-        const fullUrl = url.startsWith('http') ? url : `https://verses.quran.com/${url}`;
+      const customUrl = getVerseAudioUrl(verse.verse_key, selectedReciter, verse.audio?.url);
+      if (customUrl) {
+        const fullUrl = customUrl.startsWith('http') ? customUrl : `https://verses.quran.com/${customUrl}`;
         if (continuousAudioRef.current) {
           continuousAudioRef.current.pause();
         }
-        const audio = new Audio(fullUrl);
+
+        let audio: HTMLAudioElement;
+        
+        // If we already preloaded this audio element, use it directly!
+        if (nextAudioPreloadRef.current && (nextAudioPreloadRef.current.src === fullUrl || decodeURIComponent(nextAudioPreloadRef.current.src) === decodeURIComponent(fullUrl))) {
+          audio = nextAudioPreloadRef.current;
+        } else {
+          audio = new Audio(fullUrl);
+        }
+
         audio.onended = () => {
           setContinuousVerseIndex(prev => prev + 1);
         };
@@ -633,13 +697,33 @@ export default function App() {
         };
         audio.play().catch(e => console.error("Play error:", e));
         continuousAudioRef.current = audio;
+
+        // Immediately start preloading the NEXT verse to guarantee gapless instant playback
+        const nextVerse = continuousVerses[continuousVerseIndex + 1];
+        if (nextVerse) {
+          const nextCustomUrl = getVerseAudioUrl(nextVerse.verse_key, selectedReciter, nextVerse.audio?.url);
+          if (nextCustomUrl) {
+            const nextFullUrl = nextCustomUrl.startsWith('http') ? nextCustomUrl : `https://verses.quran.com/${nextCustomUrl}`;
+            const preloadAudio = new Audio(nextFullUrl);
+            preloadAudio.preload = "auto";
+            preloadAudio.load(); // explicitly buffer the file in the background
+            nextAudioPreloadRef.current = preloadAudio;
+          } else {
+            nextAudioPreloadRef.current = null;
+          }
+        } else {
+          nextAudioPreloadRef.current = null;
+        }
       } else {
         setContinuousVerseIndex(prev => prev + 1);
       }
     } else if (!isContinuousAudioPlaying && continuousAudioRef.current) {
       continuousAudioRef.current.pause();
+      if (nextAudioPreloadRef.current) {
+        nextAudioPreloadRef.current.pause();
+      }
     }
-  }, [isContinuousAudioPlaying, continuousVerseIndex, continuousVerses, activeTab]);
+  }, [isContinuousAudioPlaying, continuousVerseIndex, continuousVerses, activeTab, selectedReciter]);
 
   useEffect(() => {
     let requestRef: number;
@@ -660,6 +744,55 @@ export default function App() {
     };
   }, [isAutoScrolling, autoScrollSpeed, activeTab]);
 
+  // Synchronized scrolling to follow the playing audio in the Continuous Recitation tab
+  useEffect(() => {
+    if (activeTab === 'continuous' && isContinuousAudioPlaying && continuousVerses.length > 0) {
+      const element = document.getElementById(`verse-card-${continuousVerseIndex}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  }, [continuousVerseIndex, isContinuousAudioPlaying, activeTab, continuousVerses.length]);
+
+  // Synchronized scrolling to follow the playing audio in the normal Quran tab
+  useEffect(() => {
+    if (activeTab === 'quran' && playingVerseKey) {
+      const element = document.getElementById(`quran-verse-${playingVerseKey}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  }, [playingVerseKey, activeTab]);
+
+  const getVerseAudioUrl = (verseKey: string, reciterId: number, defaultUrl?: string): string => {
+    const everyAyahReciters: Record<number, string> = {
+      16: "Ghamadi_40kbps",            // سعد الغامدي
+      67: "Yasser_Ad-Dussary_128kbps",  // ياسر الدوسري
+      68: "Nasser_Alqatami_128kbps",   // ناصر القطامي
+      29: "MaherAlMuaiqly128kbps",     // ماهر المعيقلي
+      71: "ahmed_ibn_ali_al_ajamy_128kbps", // أحمد العجمي
+      77: "Fares_Abbad_64kbps"         // فارس عباد
+    };
+    
+    const subfolder = everyAyahReciters[reciterId];
+    if (subfolder && verseKey) {
+      const [surahStr, verseStr] = verseKey.split(':');
+      const surahNum = parseInt(surahStr);
+      const verseNum = parseInt(verseStr);
+      if (!isNaN(surahNum) && !isNaN(verseNum)) {
+        const pad3 = (num: number) => String(num).padStart(3, '0');
+        return `https://everyayah.com/data/${subfolder}/${pad3(surahNum)}${pad3(verseNum)}.mp3`;
+      }
+    }
+    
+    return defaultUrl || '';
+  };
+
+  const getApiReciterId = (reciterId: number): number => {
+    const customIds = [16, 67, 68, 29, 71, 77];
+    return customIds.includes(reciterId) ? 7 : reciterId;
+  };
+
   const fetchSurahs = async () => {
     try {
       setIsLoadingQuran(true);
@@ -677,7 +810,8 @@ export default function App() {
     setSelectedSurahObj(surah);
     setIsLoadingQuran(true);
     try {
-      const res = await fetch(`https://api.quran.com/api/v4/verses/by_chapter/${surah.id}?language=ar&words=true&word_fields=text_uthmani,text_uthmani_tajweed,audio_url&audio=${selectedReciter}&page=${page}&per_page=20`);
+      const apiReciter = getApiReciterId(selectedReciter);
+      const res = await fetch(`https://api.quran.com/api/v4/verses/by_chapter/${surah.id}?language=ar&words=true&word_fields=text_uthmani,text_uthmani_tajweed,audio_url&audio=${apiReciter}&page=${page}&per_page=20`);
       const data = await res.json();
       if (append) {
         setVerses(prev => [...prev, ...data.verses]);
@@ -704,7 +838,8 @@ export default function App() {
     }
     try {
       // Fetch all verses at once (per_page=300 covers the longest surah Al-Baqarah which is 286)
-      const res = await fetch(`https://api.quran.com/api/v4/verses/by_chapter/${surah.id}?language=ar&words=true&word_fields=text_uthmani,text_uthmani_tajweed,audio_url&audio=${selectedReciter}&page=1&per_page=300`);
+      const apiReciter = getApiReciterId(selectedReciter);
+      const res = await fetch(`https://api.quran.com/api/v4/verses/by_chapter/${surah.id}?language=ar&words=true&word_fields=text_uthmani,text_uthmani_tajweed,audio_url&audio=${apiReciter}&page=1&per_page=300`);
       const data = await res.json();
       setContinuousVerses(data.verses);
       if (autoPlay) {
@@ -724,6 +859,10 @@ export default function App() {
       // Reload current surah from page 1 with new reciter
       loadSurah(selectedSurahObj, 1, false);
     }
+    if (continuousSurahObj) {
+      // Reload current continuous surah with new reciter
+      loadContinuousSurah(continuousSurahObj, isContinuousAudioPlaying);
+    }
   };
 
   const playAudio = (url: string | undefined, type: 'word' | 'verse', id: string | number) => {
@@ -737,13 +876,19 @@ export default function App() {
          return;
       }
     }
-    if (!url) return;
     
-    let fullUrl = url;
-    if (!url.startsWith('http') && !url.startsWith('//')) {
-      fullUrl = `https://audio.qurancdn.com/${url}`;
-    } else if (url.startsWith('//')) {
-      fullUrl = `https:${url}`;
+    let urlToPlay = url;
+    if (type === 'verse' && id) {
+      urlToPlay = getVerseAudioUrl(id as string, selectedReciter, url);
+    }
+    
+    if (!urlToPlay) return;
+    
+    let fullUrl = urlToPlay;
+    if (!urlToPlay.startsWith('http') && !urlToPlay.startsWith('//')) {
+      fullUrl = `https://audio.qurancdn.com/${urlToPlay}`;
+    } else if (urlToPlay.startsWith('//')) {
+      fullUrl = `https:${urlToPlay}`;
     }
     
     const audio = new Audio(fullUrl);
@@ -911,7 +1056,8 @@ export default function App() {
         const fetchedVerses = [];
         for (const item of aiResults) {
           try {
-            const res = await fetch(`https://api.quran.com/api/v4/verses/by_key/${item.verse_key}?language=ar&words=true&word_fields=text_uthmani,text_uthmani_tajweed,audio_url&audio=${selectedReciter}`);
+            const apiReciter = getApiReciterId(selectedReciter);
+            const res = await fetch(`https://api.quran.com/api/v4/verses/by_key/${item.verse_key}?language=ar&words=true&word_fields=text_uthmani,text_uthmani_tajweed,audio_url&audio=${apiReciter}`);
             const data = await res.json();
             if (data.verse) {
               fetchedVerses.push({
@@ -1341,7 +1487,7 @@ export default function App() {
         )}
 
         {/* Dictionary Tab */}
-        {activeTab === 'mushaf' && <MushafView page={mushafPage} setPage={setMushafPage} fontSize={fontSize} />}
+        {activeTab === 'mushaf' && <MushafView page={mushafPage} setPage={setMushafPage} fontSize={fontSize} selectedFont={selectedFont} showTajweed={showTajweed} />}
         {activeTab === 'dictionary' && (
           <div className={`${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200/60'} p-6 md:p-8 rounded-3xl shadow-sm border transition-colors`}>
             <form onSubmit={handleSearch} className="max-w-2xl mx-auto mb-8">
@@ -1679,34 +1825,49 @@ export default function App() {
                       )}
                       
                       <div className="flex flex-wrap gap-y-6 gap-x-3 justify-start mb-6 text-right leading-loose" dir="rtl">
-                        {verse.words?.map((word: any) => (
-                          <button
-                            key={word.id}
-                            onClick={() => word.audio_url && playAudio(word.audio_url, 'word', word.id)}
-                            className={`relative group rounded-lg px-2 py-1 transition-colors ${
-                              playingWordId === word.id 
-                                ? (isDarkMode ? 'bg-emerald-900/40 text-emerald-400' : 'bg-emerald-100 text-emerald-700') 
-                                : (isDarkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-100')
-                            }`}
-                          >
-                            {word.char_type_name === 'end' ? (
-                              <span className="inline-flex items-center justify-center w-8 h-8 rounded-full border-2 border-emerald-500 text-emerald-600 text-sm font-bold mx-2">
-                                {verse.verse_key.split(':')[1]}
-                              </span>
-                            ) : (
-                              <span 
-                                className={`leading-loose quran-text ${!showTajweed ? 'no-tajweed-colors' : ''} ${isDarkMode ? 'dark-mode-text' : ''}`} 
-                                style={{ fontFamily: selectedFont, fontSize: `${fontSize}px` }}
-                                dangerouslySetInnerHTML={{ __html: cleanTajweed(word.text_uthmani_tajweed || word.text_uthmani) }}
-                              />
-                            )}
-                            {word.audio_url && word.char_type_name !== 'end' && (
-                              <span className="absolute -top-3 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Volume2 className="w-4 h-4 text-emerald-500" />
-                              </span>
-                            )}
-                          </button>
-                        ))}
+                        {verse.words?.map((word: any) => {
+                          const hasAudio = !!word.audio_url && 
+                                           word.char_type_name !== 'end' && 
+                                           word.char_type_name !== 'stop' && 
+                                           word.text_uthmani !== 'ۗ' && 
+                                           word.text_uthmani !== 'ۖ' && 
+                                           word.text_uthmani !== 'ج' && 
+                                           word.text_uthmani !== 'ۛ' && 
+                                           word.text_uthmani !== 'ۘ' && 
+                                           word.text_uthmani !== 'ۙ' && 
+                                           word.text_uthmani !== 'ۚ';
+                          const isPlaying = playingWordId === word.id;
+                          return (
+                            <span 
+                              key={word.id}
+                              onClick={() => {
+                                if (hasAudio) {
+                                  const correctUrl = getCorrectWordAudioUrl(word, verse.words, verse.verse_key);
+                                  playAudio(correctUrl, 'word', word.id);
+                                }
+                              }}
+                              className={`inline quran-text select-none transition-all duration-200 ${
+                                !showTajweed ? 'no-tajweed-colors' : ''
+                              } ${
+                                isDarkMode ? 'dark-mode-text' : ''
+                              } ${
+                                hasAudio 
+                                  ? 'cursor-pointer hover:text-emerald-500 hover:bg-emerald-500/10 rounded px-1' 
+                                  : ''
+                              } ${
+                                isPlaying 
+                                  ? (isDarkMode ? 'bg-emerald-950 text-emerald-400 font-bold border-b-2 border-emerald-500' : 'bg-emerald-50 text-emerald-700 font-bold border-b-2 border-emerald-500') 
+                                  : ''
+                              }`} 
+                              style={{ fontFamily: selectedFont, fontSize: `${fontSize}px` }}
+                              dangerouslySetInnerHTML={{ __html: cleanTajweed(showTajweed ? (word.text_uthmani_tajweed || word.text_uthmani) : word.text_uthmani) }}
+                              title={hasAudio ? "بۆ گوهداریکرنێ کلیک بکە" : undefined}
+                            />
+                          );
+                        })}
+                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-full border-2 border-emerald-500 text-emerald-600 text-sm font-bold mx-2">
+                          {verse.verse_key.split(':')[1]}
+                        </span>
                       </div>
                       
                       <div className={`flex flex-wrap items-center gap-3 p-3 rounded-2xl border transition-colors ${
@@ -1840,11 +2001,18 @@ export default function App() {
                     >
                       <option value={7}>ميشاري العفاسي</option>
                       <option value={2}>عبد الباسط عبد الصمد</option>
-                      <option value={3}>أبو بكر الشاطري</option>
-                      <option value={4}>محمود خليل الحصري</option>
+                      <option value={3}>عبد الرحمن السديس</option>
+                      <option value={4}>أبو بكر الشاطري</option>
+                      <option value={6}>محمود خليل الحصري</option>
                       <option value={9}>محمد صديق المنشاوي</option>
                       <option value={10}>سعود الشريم</option>
-                      <option value={11}>عبد الرحمن السدیس</option>
+                      <option value={11}>محمد الطبلاوي</option>
+                      <option value={16}>سعد الغامدي</option>
+                      <option value={67}>ياسر الدوسري</option>
+                      <option value={68}>ناصر القطامي</option>
+                      <option value={29}>ماهر المعيقلي</option>
+                      <option value={71}>أحمد العجمي</option>
+                      <option value={77}>فارس عباد</option>
                     </select>
                     
                     <button
@@ -1867,107 +2035,141 @@ export default function App() {
                 </div>
 
                 <div className="p-4 md:p-8 space-y-8">
-                  {verses.map((verse) => (
-                    <div key={verse.id} className={`border-b pb-8 last:border-0 ${isDarkMode ? 'border-slate-700' : 'border-slate-100'}`}>
-                      <div className="flex flex-wrap gap-y-6 gap-x-3 justify-start mb-6 text-right leading-loose" dir="rtl">
-                        {verse.words?.map((word: any) => (
+                  {verses.map((verse) => {
+                    const isPlayingThisVerse = playingVerseKey === verse.verse_key;
+                    return (
+                      <div 
+                        key={verse.id} 
+                        id={`quran-verse-${verse.verse_key}`}
+                        className={`transition-all duration-500 rounded-3xl p-6 md:p-8 border relative overflow-hidden ${
+                          isPlayingThisVerse 
+                            ? (isDarkMode 
+                                ? 'bg-emerald-950/60 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.2)] ring-2 ring-emerald-500/40 scale-[1.01]' 
+                                : 'bg-emerald-50/90 border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.15)] ring-2 ring-emerald-500/20 scale-[1.01]') 
+                            : (isDarkMode ? 'border-transparent bg-transparent hover:bg-slate-800/30' : 'border-transparent bg-transparent hover:bg-slate-50/40')
+                        }`}
+                      >
+                        {isPlayingThisVerse && (
+                          <div className="absolute top-4 left-4 flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500 text-white animate-pulse">
+                            <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+                            <span>خوێندنا دەنگی</span>
+                          </div>
+                        )}
+                        <div className="flex flex-wrap gap-y-6 gap-x-3 justify-start mb-6 text-right leading-loose" dir="rtl">
+                          {verse.words?.map((word: any) => {
+                            const hasAudio = !!word.audio_url && 
+                                             word.char_type_name !== 'end' && 
+                                             word.char_type_name !== 'stop' && 
+                                             word.text_uthmani !== 'ۗ' && 
+                                             word.text_uthmani !== 'ۖ' && 
+                                             word.text_uthmani !== 'ج' && 
+                                             word.text_uthmani !== 'ۛ' && 
+                                             word.text_uthmani !== 'ۘ' && 
+                                             word.text_uthmani !== 'ۙ' && 
+                                             word.text_uthmani !== 'ۚ';
+                            const isPlaying = playingWordId === word.id;
+                            return (
+                              <span 
+                                key={word.id}
+                                onClick={() => {
+                                  if (hasAudio) {
+                                    const correctUrl = getCorrectWordAudioUrl(word, verse.words, verse.verse_key);
+                                    playAudio(correctUrl, 'word', word.id);
+                                  }
+                                }}
+                                className={`inline quran-text select-none transition-all duration-200 ${
+                                  !showTajweed ? 'no-tajweed-colors' : ''
+                                } ${
+                                  isDarkMode ? 'dark-mode-text' : ''
+                                } ${
+                                  hasAudio 
+                                    ? 'cursor-pointer hover:text-emerald-500 hover:bg-emerald-500/10 rounded px-1' 
+                                    : ''
+                                } ${
+                                  isPlaying 
+                                    ? (isDarkMode ? 'bg-emerald-950 text-emerald-400 font-bold border-b-2 border-emerald-500' : 'bg-emerald-50 text-emerald-700 font-bold border-b-2 border-emerald-500') 
+                                    : ''
+                                }`} 
+                                style={{ fontFamily: selectedFont, fontSize: `${fontSize}px` }}
+                                dangerouslySetInnerHTML={{ __html: cleanTajweed(showTajweed ? (word.text_uthmani_tajweed || word.text_uthmani) : word.text_uthmani) }}
+                                title={hasAudio ? "بۆ گوهداریکرنێ کلیک بکە" : undefined}
+                              />
+                            );
+                          })}
+                          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full border-2 border-emerald-500 text-emerald-600 text-sm font-bold mx-2">
+                            {verse.verse_key.split(':')[1]}
+                          </span>
+                        </div>
+                        
+                        <div className={`flex flex-wrap items-center gap-3 p-3 rounded-2xl border transition-colors ${
+                          isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-100'
+                        }`}>
                           <button
-                            key={word.id}
-                            onClick={() => word.audio_url && playAudio(word.audio_url, 'word', word.id)}
-                            className={`relative group rounded-lg px-2 py-1 transition-colors ${
-                              playingWordId === word.id 
-                                ? (isDarkMode ? 'bg-emerald-900/40 text-emerald-400' : 'bg-emerald-100 text-emerald-700') 
-                                : (isDarkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-100')
+                            onClick={() => playAudio(verse.audio?.url, 'verse', verse.verse_key)}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors ${
+                              playingVerseKey === verse.verse_key 
+                                ? 'bg-emerald-600 text-white shadow-sm' 
+                                : (isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:border-emerald-500' : 'bg-white border border-slate-200 text-slate-700 hover:border-emerald-400 hover:text-emerald-600')
                             }`}
                           >
-                            {word.char_type_name === 'end' ? (
-                              <span className="inline-flex items-center justify-center w-8 h-8 rounded-full border-2 border-emerald-500 text-emerald-600 text-sm font-bold mx-2">
-                                {verse.verse_key.split(':')[1]}
-                              </span>
-                            ) : (
-                              <span 
-                                className={`leading-loose quran-text ${!showTajweed ? 'no-tajweed-colors' : ''} ${isDarkMode ? 'dark-mode-text' : ''}`} 
-                                style={{ fontFamily: selectedFont, fontSize: `${fontSize}px` }}
-                                dangerouslySetInnerHTML={{ __html: cleanTajweed(word.text_uthmani_tajweed || word.text_uthmani) }}
-                              />
-                            )}
-                            {word.audio_url && word.char_type_name !== 'end' && (
-                              <span className="absolute -top-3 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Volume2 className="w-4 h-4 text-emerald-500" />
-                              </span>
-                            )}
+                            {playingVerseKey === verse.verse_key ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                            {playingVerseKey === verse.verse_key ? 'ڕاوەستینە' : 'گوهداری بکە'}
                           </button>
-                        ))}
-                      </div>
-                      
-                      <div className={`flex flex-wrap items-center gap-3 p-3 rounded-2xl border transition-colors ${
-                        isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-100'
-                      }`}>
-                        <button
-                          onClick={() => playAudio(verse.audio?.url, 'verse', verse.verse_key)}
-                          className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors ${
-                            playingVerseKey === verse.verse_key 
-                              ? 'bg-emerald-600 text-white shadow-sm' 
-                              : (isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:border-emerald-500' : 'bg-white border border-slate-200 text-slate-700 hover:border-emerald-400 hover:text-emerald-600')
-                          }`}
-                        >
-                          {playingVerseKey === verse.verse_key ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                          {playingVerseKey === verse.verse_key ? 'ڕاوەستینە' : 'گوهداری بکە'}
-                        </button>
-                        
-                        <button
-                          onClick={() => handleGetTafsir(verse.verse_key, verse.words)}
-                          disabled={isLoadingTafsir[verse.verse_key]}
-                          className={`flex items-center gap-2 px-4 py-2 border rounded-xl font-medium transition-colors disabled:opacity-50 ${
-                            isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:border-blue-500' : 'bg-white border border-slate-200 text-slate-700 hover:border-blue-400 hover:text-blue-600'
-                          }`}
-                        >
-                          {isLoadingTafsir[verse.verse_key] ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
-                          تەفسیرا بادینی
-                        </button>
-                        
-                        <button
-                          onClick={() => handleGenerateImage(verse.verse_key, verse.words)}
-                          disabled={isGeneratingImage[verse.verse_key]}
-                          className={`flex items-center gap-2 px-4 py-2 border rounded-xl font-medium transition-colors disabled:opacity-50 ${
-                            isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:border-purple-500' : 'bg-white border border-slate-200 text-slate-700 hover:border-purple-400 hover:text-purple-600'
-                          }`}
-                        >
-                          {isGeneratingImage[verse.verse_key] ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
-                          تەفسیر ب وێنە
-                        </button>
-                      </div>
+                          
+                          <button
+                            onClick={() => handleGetTafsir(verse.verse_key, verse.words)}
+                            disabled={isLoadingTafsir[verse.verse_key]}
+                            className={`flex items-center gap-2 px-4 py-2 border rounded-xl font-medium transition-colors disabled:opacity-50 ${
+                              isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:border-blue-500' : 'bg-white border border-slate-200 text-slate-700 hover:border-blue-400 hover:text-blue-600'
+                            }`}
+                          >
+                            {isLoadingTafsir[verse.verse_key] ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
+                            تەفسیرا بادینی
+                          </button>
+                          
+                          <button
+                            onClick={() => handleGenerateImage(verse.verse_key, verse.words)}
+                            disabled={isGeneratingImage[verse.verse_key]}
+                            className={`flex items-center gap-2 px-4 py-2 border rounded-xl font-medium transition-colors disabled:opacity-50 ${
+                              isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:border-purple-500' : 'bg-white border border-slate-200 text-slate-700 hover:border-purple-400 hover:text-purple-600'
+                            }`}
+                          >
+                            {isGeneratingImage[verse.verse_key] ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
+                            تەفسیر ب وێنە
+                          </button>
+                        </div>
 
-                      {tafsirData[verse.verse_key] && (
-                        <div className={`mt-4 p-5 border rounded-2xl leading-relaxed text-lg font-kurdish transition-colors ${
-                          isDarkMode ? 'bg-blue-900/10 border-blue-900/30 text-slate-300' : 'bg-blue-50/50 border-blue-100 text-slate-700'
-                        }`}>
-                          <h4 className={`font-bold mb-2 flex items-center gap-2 ${isDarkMode ? 'text-blue-400' : 'text-blue-800'}`}>
-                            <BookOpen className="w-4 h-4" />
-                            تەفسیرا ئایەتێ:
-                          </h4>
-                          <p>{tafsirData[verse.verse_key]}</p>
-                        </div>
-                      )}
-                      
-                      {generatedImages[verse.verse_key] && (
-                        <div className={`mt-4 p-5 border rounded-2xl flex flex-col items-center transition-colors ${
-                          isDarkMode ? 'bg-purple-900/10 border-purple-900/30' : 'bg-purple-50/50 border-purple-100'
-                        }`}>
-                          <h4 className={`font-bold mb-4 flex items-center gap-2 self-start font-kurdish ${isDarkMode ? 'text-purple-400' : 'text-purple-800'}`}>
-                            <ImageIcon className="w-4 h-4" />
-                            وێنەیێ تەفسیرێ:
-                          </h4>
-                          <img 
-                            src={generatedImages[verse.verse_key]} 
-                            alt="Quranic Verse Illustration" 
-                            className="w-full max-w-2xl rounded-xl shadow-md object-cover"
-                            referrerPolicy="no-referrer"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                        {tafsirData[verse.verse_key] && (
+                          <div className={`mt-4 p-5 border rounded-2xl leading-relaxed text-lg font-kurdish transition-colors ${
+                            isDarkMode ? 'bg-blue-900/10 border-blue-900/30 text-slate-300' : 'bg-blue-50/50 border-blue-100 text-slate-700'
+                          }`}>
+                            <h4 className={`font-bold mb-2 flex items-center gap-2 ${isDarkMode ? 'text-blue-400' : 'text-blue-800'}`}>
+                              <BookOpen className="w-4 h-4" />
+                              تەفسیرا ئایەتێ:
+                            </h4>
+                            <p>{tafsirData[verse.verse_key]}</p>
+                          </div>
+                        )}
+                        
+                        {generatedImages[verse.verse_key] && (
+                          <div className={`mt-4 p-5 border rounded-2xl flex flex-col items-center transition-colors ${
+                            isDarkMode ? 'bg-purple-900/10 border-purple-900/30' : 'bg-purple-50/50 border-purple-100'
+                          }`}>
+                            <h4 className={`font-bold mb-4 flex items-center gap-2 self-start font-kurdish ${isDarkMode ? 'text-purple-400' : 'text-purple-800'}`}>
+                              <ImageIcon className="w-4 h-4" />
+                              وێنەیێ تەفسیرێ:
+                            </h4>
+                            <img 
+                              src={generatedImages[verse.verse_key]} 
+                              alt="Quranic Verse Illustration" 
+                              className="w-full max-w-2xl rounded-xl shadow-md object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                   
                   {quranPage < quranTotalPages && (
                     <div className="text-center pt-4">
@@ -1993,9 +2195,39 @@ export default function App() {
           <div className="space-y-6 pb-32">
             {!continuousSurahObj ? (
               <div className={`${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200/60'} rounded-3xl shadow-sm border overflow-hidden p-6 md:p-8 transition-colors`}>
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className={`text-2xl font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>خوێندنا بەردەوام</h2>
-                  {isLoadingContinuous && <Loader2 className="w-5 h-5 animate-spin text-emerald-600" />}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                  <div className="flex items-center gap-3">
+                    <h2 className={`text-2xl font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>خوێندنا بەردەوام</h2>
+                    {isLoadingContinuous && <Loader2 className="w-5 h-5 animate-spin text-emerald-600" />}
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <span className={`text-sm font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>دەنگێ قورئانخوێنی:</span>
+                    <select
+                      value={selectedReciter}
+                      onChange={handleReciterChange}
+                      className={`px-4 py-2 rounded-xl border outline-none transition-colors text-sm ${
+                        isDarkMode 
+                          ? 'bg-slate-900 border-slate-700 text-emerald-400 focus:border-emerald-500' 
+                          : 'bg-white border-emerald-200 text-emerald-800 focus:ring-2 focus:ring-emerald-500'
+                      }`}
+                    >
+                      <option value={7}>ميشاري العفاسي</option>
+                      <option value={2}>عبد الباسط عبد الصمد</option>
+                      <option value={3}>عبد الرحمن السديس</option>
+                      <option value={4}>أبو بكر الشاطري</option>
+                      <option value={6}>محمود خليل الحصري</option>
+                      <option value={9}>محمد صديق المنشاوي</option>
+                      <option value={10}>سعود الشريم</option>
+                      <option value={11}>محمد الطبلاوي</option>
+                      <option value={16}>سعد الغامدي</option>
+                      <option value={67}>ياسر الدوسري</option>
+                      <option value={68}>ناصر القطامي</option>
+                      <option value={29}>ماهر المعيقلي</option>
+                      <option value={71}>أحمد العجمي</option>
+                      <option value={77}>فارس عباد</option>
+                    </select>
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {surahs.map((surah) => (
@@ -2023,20 +2255,51 @@ export default function App() {
               </div>
             ) : (
               <div className={`${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200/60'} rounded-3xl shadow-sm border overflow-hidden transition-colors`}>
-                <div className={`p-6 md:p-8 border-b flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sticky top-0 z-10 backdrop-blur-md transition-colors ${
+                <div className={`p-6 md:p-8 border-b flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 sticky top-0 z-10 backdrop-blur-md transition-colors ${
                   isDarkMode ? 'border-slate-700 bg-slate-800/80' : 'border-slate-100 bg-emerald-50/50'
                 }`}>
                   <div>
                     <h2 className={`text-3xl font-bold font-serif ${isDarkMode ? 'text-emerald-400' : 'text-emerald-900'}`}>{continuousSurahObj.name_arabic}</h2>
                     <p className={`${isDarkMode ? 'text-emerald-500' : 'text-emerald-700'} mt-1`}>سورة {continuousSurahObj.name_arabic} - {continuousSurahObj.verses_count} ئایەت</p>
                   </div>
-                  <button onClick={() => {
-                    setContinuousSurahObj(null);
-                    setIsContinuousAudioPlaying(false);
-                    setIsAutoScrolling(false);
-                  }} className={`${isDarkMode ? 'text-emerald-400 hover:text-emerald-300' : 'text-emerald-600 hover:text-emerald-800'} font-medium`}>
-                    ڤەگەڕە بۆ لیستا سوورەتان
-                  </button>
+                  
+                  <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <span className={`text-sm font-medium whitespace-nowrap ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>دەنگێ قورئانخوێنی:</span>
+                      <select
+                        value={selectedReciter}
+                        onChange={handleReciterChange}
+                        className={`w-full sm:w-auto px-4 py-2 rounded-xl border outline-none transition-colors text-sm ${
+                          isDarkMode 
+                            ? 'bg-slate-900 border-slate-700 text-emerald-400 focus:border-emerald-500' 
+                            : 'bg-white border-emerald-200 text-emerald-800 focus:ring-2 focus:ring-emerald-500'
+                        }`}
+                      >
+                        <option value={7}>ميشاري العفاسي</option>
+                        <option value={2}>عبد الباسط عبد الصمد</option>
+                        <option value={3}>عبد الرحمن السديس</option>
+                        <option value={4}>أبو بكر الشاطري</option>
+                        <option value={6}>محمود خليل الحصري</option>
+                        <option value={9}>محمد صديق المنشاوي</option>
+                        <option value={10}>سعود الشريم</option>
+                        <option value={11}>محمد الطبلاوي</option>
+                        <option value={16}>سعد الغامدي</option>
+                        <option value={67}>ياسر الدوسري</option>
+                        <option value={68}>ناصر القطامي</option>
+                        <option value={29}>ماهر المعيقلي</option>
+                        <option value={71}>أحمد العجمي</option>
+                        <option value={77}>فارس عباد</option>
+                      </select>
+                    </div>
+
+                    <button onClick={() => {
+                      setContinuousSurahObj(null);
+                      setIsContinuousAudioPlaying(false);
+                      setIsAutoScrolling(false);
+                    }} className={`${isDarkMode ? 'text-emerald-400 hover:text-emerald-300' : 'text-emerald-600 hover:text-emerald-800'} font-medium whitespace-nowrap`}>
+                      ڤەگەڕە بۆ لیستا سوورەتان
+                    </button>
+                  </div>
                 </div>
 
                 <div className="p-6 md:p-8 space-y-12">
@@ -2045,57 +2308,82 @@ export default function App() {
                       <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
                     </div>
                   ) : (
-                    continuousVerses.map((verse, index) => (
-                      <div 
-                        key={verse.id} 
-                        onClick={() => {
-                          setContinuousVerseIndex(index);
-                          setIsContinuousAudioPlaying(true);
-                        }}
-                        className={`transition-all duration-500 rounded-2xl p-6 cursor-pointer border ${
-                          index === continuousVerseIndex && isContinuousAudioPlaying 
-                            ? (isDarkMode ? 'bg-emerald-900/30 border-emerald-800 shadow-sm scale-[1.01]' : 'bg-emerald-50/80 border-emerald-200 shadow-sm scale-[1.01]') 
-                            : (isDarkMode ? 'hover:bg-slate-700 border-transparent' : 'hover:bg-slate-50 border-transparent')
-                        }`}
-                      >
-                        <div className="flex flex-wrap gap-y-6 gap-x-3 justify-start mb-2 text-right leading-loose" dir="rtl">
-                          {verse.words?.map((word: any) => (
-                            <button
-                              key={word.id}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (word.audio_url) playAudio(word.audio_url, 'word', word.id);
-                              }}
-                              className={`relative group rounded-lg px-2 py-1 transition-colors ${
-                                playingWordId === word.id 
-                                  ? (isDarkMode ? 'bg-emerald-900/40 text-emerald-400' : 'bg-emerald-100 text-emerald-700') 
-                                  : (isDarkMode ? 'hover:bg-emerald-900/20' : 'hover:bg-emerald-100/50')
-                              }`}
-                            >
-                              {word.char_type_name === 'end' ? (
-                                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full border-2 border-emerald-500 text-emerald-600 text-sm font-bold mx-2">
-                                  {verse.verse_key.split(':')[1]}
-                                </span>
-                              ) : (
+                    continuousVerses.map((verse, index) => {
+                      const isPlayingThisVerse = index === continuousVerseIndex && isContinuousAudioPlaying;
+                      return (
+                        <div 
+                          key={verse.id} 
+                          id={`verse-card-${index}`}
+                          onClick={() => {
+                            setContinuousVerseIndex(index);
+                            setIsContinuousAudioPlaying(true);
+                          }}
+                          className={`transition-all duration-500 rounded-3xl p-6 md:p-8 cursor-pointer border relative overflow-hidden ${
+                            isPlayingThisVerse 
+                              ? (isDarkMode 
+                                  ? 'bg-emerald-950/60 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.25)] ring-2 ring-emerald-500/50 scale-[1.01]' 
+                                  : 'bg-emerald-50/90 border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.15)] ring-2 ring-emerald-500/30 scale-[1.01]') 
+                              : (isDarkMode ? 'border-transparent bg-slate-800/40 hover:bg-slate-800/80 hover:border-slate-700/60' : 'border-transparent bg-white hover:bg-slate-50/50 hover:border-slate-200/50')
+                          }`}
+                        >
+                          {isPlayingThisVerse && (
+                            <div className="absolute top-4 left-4 flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500 text-white animate-pulse">
+                              <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+                              <span>نوکە دهێتە خواندن</span>
+                            </div>
+                          )}
+                          <div className="flex flex-wrap gap-y-6 gap-x-3 justify-start mb-2 text-right leading-loose" dir="rtl">
+                            {verse.words?.map((word: any) => {
+                              const hasAudio = !!word.audio_url && 
+                                               word.char_type_name !== 'end' && 
+                                               word.char_type_name !== 'stop' && 
+                                               word.text_uthmani !== 'ۗ' && 
+                                               word.text_uthmani !== 'ۖ' && 
+                                               word.text_uthmani !== 'ج' && 
+                                               word.text_uthmani !== 'ۛ' && 
+                                               word.text_uthmani !== 'ۘ' && 
+                                               word.text_uthmani !== 'ۙ' && 
+                                               word.text_uthmani !== 'ۚ';
+                              const isPlaying = playingWordId === word.id;
+                              return (
                                 <span 
-                                  className={`leading-loose quran-text ${!showTajweed ? 'no-tajweed-colors' : ''} ${isDarkMode ? 'dark-mode-text' : ''}`} 
+                                  key={word.id}
+                                  onClick={(e) => {
+                                    if (hasAudio) {
+                                      e.stopPropagation();
+                                      const correctUrl = getCorrectWordAudioUrl(word, verse.words, verse.verse_key);
+                                      playAudio(correctUrl, 'word', word.id);
+                                    }
+                                  }}
+                                  className={`inline quran-text select-none transition-all duration-200 ${
+                                    !showTajweed ? 'no-tajweed-colors' : ''
+                                  } ${
+                                    isDarkMode ? 'dark-mode-text' : ''
+                                  } ${
+                                    hasAudio 
+                                      ? 'cursor-pointer hover:text-emerald-500 hover:bg-emerald-500/10 rounded px-1' 
+                                      : ''
+                                  } ${
+                                    isPlaying 
+                                      ? (isDarkMode ? 'bg-emerald-950 text-emerald-400 font-bold border-b-2 border-emerald-500' : 'bg-emerald-50 text-emerald-700 font-bold border-b-2 border-emerald-500') 
+                                      : ''
+                                  }`} 
                                   style={{ fontFamily: selectedFont, fontSize: `${fontSize}px` }}
-                                  dangerouslySetInnerHTML={{ __html: cleanTajweed(word.text_uthmani_tajweed || word.text_uthmani) }}
+                                  dangerouslySetInnerHTML={{ __html: cleanTajweed(showTajweed ? (word.text_uthmani_tajweed || word.text_uthmani) : word.text_uthmani) }}
+                                  title={hasAudio ? "بۆ گوهداریکرنێ کلیک بکە" : undefined}
                                 />
-                              )}
-                              {word.audio_url && word.char_type_name !== 'end' && (
-                                <span className="absolute -top-3 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <Volume2 className="w-4 h-4 text-emerald-500" />
-                                </span>
-                              )}
-                            </button>
-                          ))}
+                              );
+                            })}
+                            <span className="inline-flex items-center justify-center w-8 h-8 rounded-full border-2 border-emerald-500 text-emerald-600 text-sm font-bold mx-2">
+                              {verse.verse_key.split(':')[1]}
+                            </span>
+                          </div>
+                          <div className="flex justify-end">
+                            <span className={`text-[10px] font-medium ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>ئایەتا {verse.verse_key}</span>
+                          </div>
                         </div>
-                        <div className="flex justify-end">
-                           <span className={`text-[10px] font-medium ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>ئایەتا {verse.verse_key}</span>
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>

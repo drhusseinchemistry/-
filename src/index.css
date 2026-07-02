@@ -21,38 +21,50 @@
 }
 
 /* Highly Visible Tajweed Colors */
-.quran-text .madd { color: #FF0000; font-weight: bold; } /* Bright Red */
-.quran-text .ghunnah { color: #00A000; font-weight: bold; } /* Bright Green */
-.quran-text .slnt { color: #9E9E9E; } /* Gray (Silent) */
-.quran-text .qalqalah { color: #0000FF; font-weight: bold; } /* Bright Blue */
-.quran-text .ikhfa { color: #FF7F00; font-weight: bold; } /* Orange */
-.quran-text .idgham { color: #9C27B0; font-weight: bold; } /* Purple */
-.quran-text .iqlab { color: #00BCD4; font-weight: bold; } /* Cyan */
+.quran-text .madd, .quran-text [class*="madd"], .quran-text [class*="madda"] { color: #FF0000 !important; } /* Bright Red */
+.quran-text .ghunnah, .quran-text [class*="ghunnah"] { color: #00A000 !important; } /* Bright Green */
+.quran-text .slnt, .quran-text [class*="slnt"], .quran-text [class*="silent"] { color: #9E9E9E !important; } /* Gray (Silent) */
+.quran-text .qalqalah, .quran-text [class*="qalaqah"], .quran-text [class*="qalqalah"] { color: #0000FF !important; } /* Bright Blue */
+.quran-text .ikhfa, .quran-text [class*="ikhafa"], .quran-text [class*="ikhfa"] { color: #FF7F00 !important; } /* Orange */
+.quran-text .idgham, .quran-text [class*="idgham"] { color: #9C27B0 !important; } /* Purple */
+.quran-text .iqlab, .quran-text [class*="iqlab"] { color: #00BCD4 !important; } /* Cyan */
+.quran-text .ham_wasl, .quran-text [class*="ham_wasl"] { color: #8F9CAE !important; } /* Muted blue-gray for Hamzatul Wasl */
 
-/* Catch all specific classes */
-.quran-text [class*="madd"] { color: #FF0000; font-weight: bold; }
-.quran-text [class*="ghunnah"] { color: #00A000; font-weight: bold; }
-.quran-text [class*="slnt"] { color: #9E9E9E; }
-.quran-text [class*="qalqalah"] { color: #0000FF; font-weight: bold; }
-.quran-text [class*="ikhfa"] { color: #FF7F00; font-weight: bold; }
-.quran-text [class*="idgham"] { color: #9C27B0; font-weight: bold; }
-.quran-text [class*="iqlab"] { color: #00BCD4; font-weight: bold; }
+/* Force custom <rule> tags to use display: contents to preserve cursive Arabic letter connections */
+.quran-text rule {
+  display: contents !important;
+}
+
+.quran-text span {
+  display: inline !important;
+  font-weight: inherit !important;
+  font-style: inherit !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+}
 
 /* Class to disable tajweed colors while keeping the correct text structure */
 .quran-text.no-tajweed-colors [class*="madd"],
+.quran-text.no-tajweed-colors [class*="madda"],
 .quran-text.no-tajweed-colors [class*="ghunnah"],
 .quran-text.no-tajweed-colors [class*="slnt"],
+.quran-text.no-tajweed-colors [class*="silent"],
+.quran-text.no-tajweed-colors [class*="qalaqah"],
 .quran-text.no-tajweed-colors [class*="qalqalah"],
+.quran-text.no-tajweed-colors [class*="ikhafa"],
 .quran-text.no-tajweed-colors [class*="ikhfa"],
 .quran-text.no-tajweed-colors [class*="idgham"],
 .quran-text.no-tajweed-colors [class*="iqlab"],
+.quran-text.no-tajweed-colors [class*="ham_wasl"],
 .quran-text.no-tajweed-colors .madd,
 .quran-text.no-tajweed-colors .ghunnah,
 .quran-text.no-tajweed-colors .slnt,
 .quran-text.no-tajweed-colors .qalqalah,
 .quran-text.no-tajweed-colors .ikhfa,
 .quran-text.no-tajweed-colors .idgham,
-.quran-text.no-tajweed-colors .iqlab {
+.quran-text.no-tajweed-colors .iqlab,
+.quran-text.no-tajweed-colors .ham_wasl {
   color: inherit !important;
   font-weight: inherit !important;
 }
