@@ -35,7 +35,7 @@
   display: contents !important;
 }
 
-.quran-text span {
+.quran-word span {
   display: inline !important;
   font-weight: inherit !important;
   font-style: inherit !important;

@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Search, Book, List as ListIcon, Loader2, BookOpen, ChevronRight, Key, Save, Check, Play, Volume2, MessageCircle, BookHeart, Pause, Image as ImageIcon, Download, Sun, Moon, Type as TypeIcon, Plus, Minus } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
+import { motion, AnimatePresence } from 'motion/react';
 
 const commonWords = [
   { word: 'ٱللَّهُ', meaning: 'خودێ' },
@@ -86,19 +87,143 @@ const getCorrectWordAudioUrl = (word: any, wordsList: any[], verseKey: string): 
 
 import { surahs as surahList } from './constants';
 
-function MushafView({ page, setPage, fontSize, selectedFont, showTajweed }: { page: number, setPage: (p: number) => void, fontSize: number, selectedFont: string, showTajweed: boolean }) {
+// A helper to render elegant gold corner flourishes for the Mus'haf page border
+const CornerOrnament = ({ position }: { position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' }) => {
+  const rotationClass = {
+    'top-left': '',
+    'top-right': 'rotate-90',
+    'bottom-right': 'rotate-180',
+    'bottom-left': '-rotate-90',
+  }[position];
+
+  return (
+    <svg 
+      className={`absolute w-10 h-10 sm:w-16 sm:h-16 text-amber-600/40 dark:text-amber-500/30 pointer-events-none ${rotationClass} ${
+        position.startsWith('top') ? 'top-0' : 'bottom-0'
+      } ${
+        position.endsWith('left') ? 'left-0' : 'right-0'
+      }`} 
+      viewBox="0 0 100 100" 
+      fill="currentColor"
+    >
+      <path d="M0 0 L100 0 C90 10, 90 20, 80 30 C70 40, 60 40, 50 50 C40 60, 40 70, 30 80 C20 90, 10 90, 0 100 Z" opacity="0.1" />
+      <path d="M0 0 H40 C32 8, 24 12, 20 20 C12 24, 8 32, 0 40 Z" />
+      <path d="M0 0 V40 C8 32, 12 24, 20 20 C24 12, 32 8, 40 0 Z" />
+      <circle cx="12" cy="12" r="4" fill="#d97706" />
+      <circle cx="20" cy="20" r="2.5" fill="#d97706" />
+      <circle cx="28" cy="28" r="1.5" fill="#d97706" />
+    </svg>
+  );
+};
+
+// A helper to render a stunning gold Medina-style verse marker
+const VerseEndMarker = ({ num, isPlaying, onClick }: { num: string; isPlaying: boolean; onClick: () => void }) => {
+  const toArabicNumerals = (str: string) => {
+    const arabicDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+    return str.replace(/[0-9]/g, (w) => arabicDigits[parseInt(w)]);
+  };
+
+  return (
+    <span 
+      onClick={onClick}
+      className={`inline-flex items-center justify-center mx-1.5 cursor-pointer select-none transition-transform hover:scale-115 active:scale-90 ${
+        isPlaying ? 'scale-105' : ''
+      }`}
+      title={`ئایەتا ${num} - کلیک بکە بۆ تەفسیر و دەنگی`}
+    >
+      <svg className="w-7 h-7 sm:w-8 sm:h-8 inline-block align-middle" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* Outer star/polygon ornament */}
+        <path 
+          d="M50 2 C58 12 68 12 78 22 C88 32 88 42 98 50 C88 58 88 68 78 78 C68 88 58 88 50 98 C42 88 32 88 22 78 C12 68 12 58 2 50 C12 42 12 32 22 22 C32 12 42 12 50 2 Z" 
+          fill={isPlaying ? "url(#gold-grad-active)" : "url(#gold-grad)"} 
+          stroke={isPlaying ? "#10b981" : "#b45309"} 
+          strokeWidth="3.5"
+        />
+        {/* Inner circle */}
+        <circle cx="50" cy="50" r="26" fill={isPlaying ? "#10b981" : "#fcfaf6"} stroke={isPlaying ? "#047857" : "#d97706"} strokeWidth="2" />
+        {/* Small golden beads */}
+        <circle cx="50" cy="18" r="3.5" fill="#b45309" />
+        <circle cx="50" cy="82" r="3.5" fill="#b45309" />
+        <circle cx="18" cy="50" r="3.5" fill="#b45309" />
+        <circle cx="82" cy="50" r="3.5" fill="#b45309" />
+        {/* Verse Number */}
+        <text 
+          x="50" 
+          y="57" 
+          textAnchor="middle" 
+          fill={isPlaying ? "#ffffff" : "#1e293b"} 
+          fontWeight="800" 
+          fontSize="24" 
+          fontFamily="sans-serif"
+        >
+          {toArabicNumerals(num)}
+        </text>
+        <defs>
+          <linearGradient id="gold-grad" x1="0" y1="0" x2="100" y2="100">
+            <stop offset="0%" stopColor="#f59e0b" />
+            <stop offset="50%" stopColor="#fbbf24" />
+            <stop offset="100%" stopColor="#d97706" />
+          </linearGradient>
+          <linearGradient id="gold-grad-active" x1="0" y1="0" x2="100" y2="100">
+            <stop offset="0%" stopColor="#34d399" />
+            <stop offset="100%" stopColor="#059669" />
+          </linearGradient>
+        </defs>
+      </svg>
+    </span>
+  );
+};
+
+function MushafView({ 
+  page, 
+  setPage, 
+  fontSize, 
+  selectedFont, 
+  showTajweed,
+  isDarkMode,
+  selectedReciter,
+  playAudio,
+  playingWordId,
+  playingVerseKey,
+  tafsirData,
+  isLoadingTafsir,
+  generatedImages,
+  isGeneratingImage,
+  handleGetTafsir,
+  handleGenerateImage,
+  getCorrectWordAudioUrl,
+  cleanTajweed
+}: { 
+  page: number;
+  setPage: (p: number) => void;
+  fontSize: number;
+  selectedFont: string;
+  showTajweed: boolean;
+  isDarkMode: boolean;
+  selectedReciter: number;
+  playAudio: (url: string | undefined, type: 'word' | 'verse', id: string | number) => void;
+  playingWordId: number | null;
+  playingVerseKey: string | null;
+  tafsirData: Record<string, string>;
+  isLoadingTafsir: Record<string, boolean>;
+  generatedImages: Record<string, string>;
+  isGeneratingImage: Record<string, boolean>;
+  handleGetTafsir: (verseKey: string, words: any[]) => Promise<void>;
+  handleGenerateImage: (verseKey: string, words: any[]) => Promise<void>;
+  getCorrectWordAudioUrl: (word: any, wordsList: any[], verseKey: string) => string;
+  cleanTajweed: (text: string) => string;
+}) {
   const [showSurahList, setShowSurahList] = useState(false);
   const [jumpPage, setJumpPage] = useState(page.toString());
   const [isLoading, setIsLoading] = useState(true);
   const [verses, setVerses] = useState<any[]>([]);
-  const [playingId, setPlayingId] = useState<string | null>(null);
-  const audioRef = React.useRef<HTMLAudioElement | null>(null);
+  const [selectedVerse, setSelectedVerse] = useState<any | null>(null);
 
   useEffect(() => {
     const fetchPageVerses = async () => {
       setIsLoading(true);
       try {
-        const res = await fetch(`https://api.quran.com/api/v4/verses/by_page/${page}?language=ar&words=true&word_fields=text_uthmani,text_uthmani_tajweed,audio_url`);
+        const res = await fetch(`https://api.quran.com/api/v4/verses/by_page/${page}?language=ar&words=true&word_fields=text_uthmani,text_uthmani_tajweed,audio_url&per_page=50`);
         const data = await res.json();
         setVerses(data.verses);
       } catch (err) {
@@ -110,79 +235,79 @@ function MushafView({ page, setPage, fontSize, selectedFont, showTajweed }: { pa
     fetchPageVerses();
   }, [page]);
 
-  const playAudio = (url: string | undefined, id: string) => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      if (playingId === id) {
-        setPlayingId(null);
-        return;
-      }
-    }
-    if (!url) return;
-    
-    const fullUrl = url.startsWith('http') ? url : `https://audio.qurancdn.com/${url}`;
-    const audio = new Audio(fullUrl);
-    audio.onplay = () => setPlayingId(id);
-    audio.onended = () => { setPlayingId(null); audioRef.current = null; };
-    audio.onerror = () => { setPlayingId(null); audioRef.current = null; };
-    audio.play();
-    audioRef.current = audio;
-  };
-
-  const nextPage = () => { if (page < 604) { setPage(page + 1); setJumpPage((page + 1).toString()); } };
-  const prevPage = () => { if (page > 1) { setPage(page - 1); setJumpPage((page - 1).toString()); } };
+  const nextPage = () => { if (page < 604) { setPage(page + 1); setJumpPage((page + 1).toString()); setSelectedVerse(null); } };
+  const prevPage = () => { if (page > 1) { setPage(page - 1); setJumpPage((page - 1).toString()); setSelectedVerse(null); } };
 
   const handleJump = (e: React.FormEvent) => {
     e.preventDefault();
     const p = parseInt(jumpPage);
-    if (p >= 1 && p <= 604) setPage(p);
+    if (p >= 1 && p <= 604) {
+      setPage(p);
+      setSelectedVerse(null);
+    }
   };
 
   const getSurahForPage = (p: number) => {
     return [...surahList].reverse().find(s => s.startPage <= p) || surahList[0];
   };
 
+  const getJuzForPage = (p: number) => {
+    if (p <= 1) return 1;
+    if (p <= 21) return 1;
+    return Math.min(30, Math.floor((p - 2) / 20) + 1);
+  };
+
   const currentSurah = getSurahForPage(page);
 
   return (
-    <div className="flex flex-col items-center w-full max-w-4xl mx-auto p-2 sm:p-4 space-y-4">
+    <div className="flex flex-col items-center w-full max-w-4xl mx-auto p-2 sm:p-4 space-y-5">
       {/* Header Controls */}
-      <div className="flex items-center justify-between w-full bg-white dark:bg-zinc-900 p-3 sm:p-4 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-800 sticky top-0 z-20">
+      <div className={`flex items-center justify-between w-full p-3 sm:p-4 rounded-2xl shadow-sm border sticky top-0 z-20 transition-colors ${
+        isDarkMode ? 'bg-slate-900/90 border-slate-800 backdrop-blur-md' : 'bg-white/90 border-zinc-200/80 backdrop-blur-md'
+      }`}>
         <div className="flex items-center gap-2 sm:gap-4">
           <button 
             onClick={() => setShowSurahList(!showSurahList)}
-            className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors"
+            className={`p-2.5 rounded-xl transition-all ${
+              isDarkMode ? 'hover:bg-slate-800 text-emerald-400 bg-slate-900' : 'hover:bg-emerald-50 text-emerald-600 bg-emerald-50/40'
+            }`}
             title="لیستا سورەتان"
           >
-            <ListIcon className="w-6 h-6 text-emerald-600" />
+            <ListIcon className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
-          <div className="flex flex-col">
-            <span className="text-base sm:text-lg font-bold text-zinc-900 dark:text-zinc-100 leading-tight">{currentSurah.name}</span>
+          <div className="flex flex-col text-right">
+            <span className={`text-base sm:text-lg font-bold leading-tight ${isDarkMode ? 'text-emerald-400' : 'text-emerald-900'}`}>{currentSurah.name}</span>
             <span className="text-[10px] sm:text-xs text-zinc-500">{currentSurah.englishName}</span>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <form onSubmit={handleJump} className="flex items-center gap-1 sm:gap-2">
+          <form onSubmit={handleJump} className="flex items-center gap-1.5 sm:gap-2">
             <input 
               type="number"
               value={jumpPage}
               onChange={(e) => setJumpPage(e.target.value)}
-              className="w-12 sm:w-16 p-1.5 sm:p-2 text-center bg-zinc-100 dark:bg-zinc-800 rounded-xl border-none focus:ring-2 focus:ring-emerald-500 text-sm sm:text-base"
+              className={`w-14 sm:w-16 p-2 text-center rounded-xl border font-bold text-sm sm:text-base ${
+                isDarkMode ? 'bg-slate-800 border-slate-700 text-emerald-400' : 'bg-slate-50 border-zinc-200 text-emerald-800'
+              }`}
               min="1"
               max="604"
             />
-            <span className="text-zinc-400 text-xs sm:text-sm">/ 604</span>
+            <span className="text-zinc-400 text-xs sm:text-sm font-bold">/ ٦٠٤</span>
           </form>
         </div>
       </div>
 
-      {/* Surah Selection Modal/Dropdown */}
+      {/* Surah Selection Dropdown */}
       {showSurahList && (
-        <div className="w-full bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden max-h-[60vh] overflow-y-auto animate-in fade-in slide-in-from-top-4 duration-200">
-          <div className="sticky top-0 bg-white dark:bg-zinc-900 p-4 border-b border-zinc-100 dark:border-zinc-800 z-10 flex justify-between items-center">
-            <h3 className="font-bold text-zinc-900 dark:text-zinc-100">لیستا سورەتان</h3>
-            <button onClick={() => setShowSurahList(false)} className="text-zinc-400 hover:text-zinc-600">
+        <div className={`w-full rounded-2xl shadow-xl border overflow-hidden max-h-[60vh] overflow-y-auto duration-200 transition-colors ${
+          isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-zinc-200'
+        }`}>
+          <div className={`sticky top-0 p-4 border-b z-10 flex justify-between items-center ${
+            isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-zinc-100'
+          }`}>
+            <h3 className={`font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>لیستا سورەتان</h3>
+            <button onClick={() => setShowSurahList(false)} className="text-zinc-400 hover:text-zinc-600 transition-colors">
               <Plus className="w-5 h-5 rotate-45" />
             </button>
           </div>
@@ -194,120 +319,350 @@ function MushafView({ page, setPage, fontSize, selectedFont, showTajweed }: { pa
                   setPage(s.startPage);
                   setJumpPage(s.startPage.toString());
                   setShowSurahList(false);
+                  setSelectedVerse(null);
                 }}
-                className={`flex items-center justify-between p-3 rounded-xl transition-colors ${
+                className={`flex items-center justify-between p-3 rounded-xl transition-all ${
                   currentSurah.id === s.id 
-                    ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600' 
-                    : 'hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+                    ? (isDarkMode ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-800/40' : 'bg-emerald-50 text-emerald-700') 
+                    : (isDarkMode ? 'hover:bg-slate-800/60 text-slate-300' : 'hover:bg-zinc-50 text-zinc-700')
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <span className="text-[10px] w-5 h-5 flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-full opacity-70">{s.id}</span>
-                  <span className="font-medium text-sm sm:text-base">{s.name}</span>
+                  <span className={`text-[10px] w-5 h-5 flex items-center justify-center rounded-full opacity-70 font-bold ${
+                    isDarkMode ? 'bg-slate-800 text-emerald-400' : 'bg-zinc-100 text-zinc-600'
+                  }`}>{s.id}</span>
+                  <span className="font-semibold text-sm sm:text-base">{s.name}</span>
                 </div>
-                <span className="text-[10px] opacity-50">ل. {s.startPage}</span>
+                <span className="text-[10px] opacity-60">ل. {s.startPage}</span>
               </button>
             ))}
           </div>
         </div>
       )}
 
-      {/* Page Viewer (Text) */}
-      <div className="relative w-full aspect-[3/4.5] sm:aspect-[3/4] bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 group select-none p-6 sm:p-10 overflow-y-auto">
-        {isLoading && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-50 dark:bg-zinc-900 z-10">
-            <Loader2 className="w-10 h-10 text-emerald-600 animate-spin mb-2" />
-            <span className="text-xs text-zinc-400 animate-pulse">لاپەڕە دهێتە بارکرن...</span>
+      {/* Main Quran Book Page Container */}
+      <div className={`relative w-full aspect-[1/1.42] sm:aspect-[1/1.41] rounded-3xl shadow-[0_15px_40px_rgba(0,0,0,0.12)] border overflow-hidden transition-all duration-300 group p-3 sm:p-5 ${
+        isDarkMode 
+          ? 'bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 border-amber-900/30' 
+          : 'bg-[#fcf9f2] border-amber-900/15'
+      }`}>
+        
+        {/* Outer Elegant Gold Border Line */}
+        <div className={`absolute inset-2 sm:inset-3 border rounded-2xl pointer-events-none z-10 ${
+          isDarkMode ? 'border-amber-700/20' : 'border-amber-600/25'
+        }`} />
+        
+        {/* Inner Detailed Gilded Border Framework */}
+        <div className={`absolute inset-4 sm:inset-6 border-[3px] rounded-xl pointer-events-none z-10 ${
+          isDarkMode ? 'border-amber-500/15' : 'border-amber-600/20'
+        }`} />
+
+        {/* Thick Ornate Middle Margin Fill */}
+        <div className={`absolute inset-4 sm:inset-6 border-[8px] sm:border-[12px] rounded-xl pointer-events-none opacity-25 dark:opacity-10 z-10 ${
+          isDarkMode ? 'border-amber-700/10 bg-gradient-to-b from-amber-900/5 to-amber-900/0' : 'border-amber-700/10 bg-amber-50/10'
+        }`} />
+
+        {/* 4 Beautiful Corner Medallions */}
+        <CornerOrnament position="top-left" />
+        <CornerOrnament position="top-right" />
+        <CornerOrnament position="bottom-left" />
+        <CornerOrnament position="bottom-right" />
+
+        {/* The Text & Content Area inside the Borders */}
+        <div className="w-full h-full p-4 sm:p-8 flex flex-col justify-between overflow-y-auto relative">
+          
+          {/* Dynamic Page Header (Surah and Juz) */}
+          <div className={`flex items-center justify-between w-full border-b pb-2 mb-4 text-xs sm:text-sm font-serif font-bold select-none px-2 z-10 ${
+            isDarkMode ? 'border-amber-800/30 text-amber-500/80' : 'border-amber-600/35 text-amber-800/80'
+          }`}>
+            <span>سُورَةُ {currentSurah.name}</span>
+            <span className="opacity-90 tracking-wide">الجُزْءُ {getJuzForPage(page)}</span>
+            <span>لاپەڕە {page}</span>
           </div>
-        )}
-        
-        <div className="text-right leading-[2.5] sm:leading-[3] text-zinc-900 dark:text-zinc-100 quran-text" style={{ fontFamily: selectedFont, fontSize: `${fontSize}px` }}>
-          {verses.map(verse => (
-            <span key={verse.id} className="inline-block relative group/verse">
-              {verse.words.map((word: any) => {
-                const hasAudio = !!word.audio_url && 
-                                 word.char_type_name !== 'end' && 
-                                 word.char_type_name !== 'stop' && 
-                                 word.text_uthmani !== 'ۗ' && 
-                                 word.text_uthmani !== 'ۖ' && 
-                                 word.text_uthmani !== 'ج' && 
-                                 word.text_uthmani !== 'ۛ' && 
-                                 word.text_uthmani !== 'ۘ' && 
-                                 word.text_uthmani !== 'ۙ' && 
-                                 word.text_uthmani !== 'ۚ';
-                const isPlaying = playingId === `word-${word.id}`;
-                return (
-                  <span 
-                    key={word.id} 
-                    onClick={() => {
-                      if (hasAudio) {
-                        const correctUrl = getCorrectWordAudioUrl(word, verse.words, verse.verse_key);
-                        playAudio(correctUrl, `word-${word.id}`);
-                      }
-                    }}
-                    className={`inline px-1 select-none transition-all duration-200 ${
-                      hasAudio 
-                        ? 'cursor-pointer hover:text-emerald-500 hover:bg-emerald-500/10 rounded' 
+
+          {/* Loading Spinner */}
+          {isLoading && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center z-20 rounded-2xl bg-inherit">
+              <Loader2 className="w-10 h-10 text-emerald-600 animate-spin mb-2" />
+              <span className={`text-xs animate-pulse font-bold ${isDarkMode ? 'text-slate-400' : 'text-zinc-500'}`}>لاپەڕە دهێتە ئامادەکرن...</span>
+            </div>
+          )}
+
+          {/* Core Quran Texts */}
+          <div 
+            className={`w-full flex-1 text-zinc-900 dark:text-zinc-100 quran-text select-none pb-16 z-10 pt-2`} 
+            style={{ 
+              fontFamily: selectedFont, 
+              fontSize: `${fontSize}px`,
+              lineHeight: '2.4em',
+              textAlign: 'justify',
+              textAlignLast: 'center'
+            }}
+            dir="rtl"
+          >
+            {verses.map((verse) => {
+              const isFirstVerseOfSurah = verse.verse_key.endsWith(':1');
+              const surahId = parseInt(verse.verse_key.split(':')[0]);
+              const verseNum = verse.verse_key.split(':')[1];
+              const isVersePlaying = playingVerseKey === verse.verse_key;
+              const isSelected = selectedVerse?.id === verse.id;
+
+              return (
+                <React.Fragment key={verse.id}>
+                  {/* Ornate Surah Start Banner */}
+                  {isFirstVerseOfSurah && (
+                    <div className="w-full block my-6 sm:my-8 select-none text-center">
+                      <div className="relative w-full max-w-lg mx-auto h-16 sm:h-20 flex items-center justify-center bg-[#fbf9f4] dark:bg-slate-950 border-double border-[5px] border-amber-600/60 rounded-xl shadow-sm px-4">
+                        <div className="absolute left-3 text-amber-600/60 text-lg select-none">💠</div>
+                        <div className="absolute right-3 text-amber-600/60 text-lg select-none">💠</div>
+                        <span className="font-serif text-2xl sm:text-3xl text-amber-800 dark:text-amber-300 font-extrabold tracking-wide drop-shadow-sm">
+                          سُورَةُ {surahList.find(s => s.id === surahId)?.name || ""}
+                        </span>
+                      </div>
+                      
+                      {/* Basmalah block */}
+                      {surahId !== 1 && surahId !== 9 && (
+                        <div className="w-full text-center my-6 py-2 text-2xl sm:text-3xl font-serif text-zinc-800 dark:text-zinc-100 select-none font-extrabold tracking-wide">
+                          بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Words segment with highlight support */}
+                  <span className={`inline transition-colors duration-300 px-1 rounded-xl ${
+                    isVersePlaying 
+                      ? 'bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 ring-1 ring-emerald-500/20' 
+                      : isSelected
+                        ? 'bg-amber-500/10 dark:bg-amber-500/15 ring-1 ring-amber-500/20'
                         : ''
-                    } ${
-                      isPlaying 
-                        ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 font-bold border-b-2 border-emerald-500' 
-                        : ''
-                    }`} 
-                    dangerouslySetInnerHTML={{ __html: cleanTajweed(showTajweed ? (word.text_uthmani_tajweed || word.text_uthmani) : word.text_uthmani) }}
-                    title={hasAudio ? "بۆ گوهداریکرنێ کلیک بکە" : undefined}
-                  />
-                );
-              })}
-              <button 
-                onClick={() => playAudio(verse.audio_url, `verse-${verse.id}`)}
-                className={`inline-flex items-center justify-center mx-2 text-zinc-500 text-sm hover:text-emerald-600 ${playingId === `verse-${verse.id}` ? 'text-emerald-600' : ''}`}
-              >
-                {verse.verse_key.split(':')[1]}
-              </button>
+                  }`}>
+                    {verse.words?.map((word: any) => {
+                      if (word.char_type_name === 'end') return null;
+                      const hasAudio = !!word.audio_url && 
+                                       word.char_type_name !== 'end' && 
+                                       word.char_type_name !== 'stop' && 
+                                       word.text_uthmani !== 'ۗ' && 
+                                       word.text_uthmani !== 'ۖ' && 
+                                       word.text_uthmani !== 'ج' && 
+                                       word.text_uthmani !== 'ۛ' && 
+                                       word.text_uthmani !== 'ۘ' && 
+                                       word.text_uthmani !== 'ۙ' && 
+                                       word.text_uthmani !== 'ۚ';
+                      const isWordPlaying = playingWordId === word.id;
+
+                      return (
+                        <React.Fragment key={word.id}>
+                          <span 
+                            onClick={(e) => {
+                              if (hasAudio) {
+                                e.stopPropagation();
+                                const correctUrl = getCorrectWordAudioUrl(word, verse.words, verse.verse_key);
+                                playAudio(correctUrl, 'word', word.id);
+                              }
+                            }}
+                            className={`inline-block quran-word quran-text select-none transition-all duration-200 mx-0.5 ${
+                              !showTajweed ? 'no-tajweed-colors' : ''
+                            } ${
+                              isDarkMode ? 'dark-mode-text' : ''
+                            } ${
+                              hasAudio 
+                                ? 'cursor-pointer hover:text-emerald-500 hover:bg-emerald-500/10 rounded px-1' 
+                                : ''
+                            } ${
+                              isWordPlaying 
+                                ? (isDarkMode ? 'bg-emerald-950 text-emerald-400 font-bold border-b-2 border-emerald-500 scale-105' : 'bg-emerald-50 text-emerald-700 font-bold border-b-2 border-emerald-500 scale-105') 
+                                : ''
+                            }`}
+                            dangerouslySetInnerHTML={{ __html: cleanTajweed(showTajweed ? (word.text_uthmani_tajweed || word.text_uthmani) : word.text_uthmani) }}
+                            title={hasAudio ? "بۆ گوهداریکرنێ کلیک بکە" : undefined}
+                          />
+                          {' '}
+                        </React.Fragment>
+                      );
+                    })}
+
+                    {/* Highly Polished Gold Flower Verse End Marker */}
+                    <VerseEndMarker 
+                      num={verseNum} 
+                      isPlaying={isVersePlaying} 
+                      onClick={() => setSelectedVerse(verse)} 
+                    />
+                  </span>
+                  {' '}
+                </React.Fragment>
+              );
+            })}
+          </div>
+
+          {/* Premium Bottom Faded Page Indicator */}
+          <div className="absolute bottom-2 left-0 right-0 flex items-center justify-center pb-2 z-10 pointer-events-none select-none">
+            <span className={`px-4 py-1.5 rounded-full text-xs font-bold shadow-sm border ${
+              isDarkMode ? 'bg-slate-950 border-amber-900/30 text-amber-500/80' : 'bg-amber-50/80 border-amber-600/15 text-amber-800'
+            }`}>
+              الْجُزْءُ {getJuzForPage(page)} • صَفْحَة {page}
             </span>
-          ))}
-        </div>
-        
-        {/* Navigation Overlays (Invisible clickable areas) */}
-        <div className="absolute inset-0 flex z-10">
-          <button 
-            onClick={prevPage}
-            className="w-1/2 h-full cursor-w-resize"
-            title="لاپەڕێ پێشتر"
-          />
-          <button 
-            onClick={nextPage}
-            className="w-1/2 h-full cursor-e-resize"
-            title="لاپەڕێ پاشتر"
-          />
+          </div>
         </div>
 
-        {/* Floating Controls (Visible on hover or touch) */}
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-          <button 
-            onClick={prevPage}
-            disabled={page === 1}
-            className="p-3 bg-white/90 dark:bg-zinc-900/90 backdrop-blur shadow-lg rounded-full hover:scale-110 transition-transform disabled:opacity-50 text-emerald-600"
-          >
-            <ChevronRight className="w-6 h-6 rotate-180" />
-          </button>
-          <div className="px-6 py-2 bg-white/90 dark:bg-zinc-900/90 backdrop-blur shadow-lg rounded-full font-bold text-emerald-600 min-w-[80px] text-center">
-            {page}
-          </div>
-          <button 
-            onClick={nextPage}
-            disabled={page === 604}
-            className="p-3 bg-white/90 dark:bg-zinc-900/90 backdrop-blur shadow-lg rounded-full hover:scale-110 transition-transform disabled:opacity-50 text-emerald-600"
-          >
-            <ChevronRight className="w-6 h-6" />
-          </button>
-        </div>
+        {/* Side-floating gold page turner arrows (Non-blocking) */}
+        <button 
+          onClick={prevPage}
+          disabled={page === 1}
+          className="absolute left-10 top-1/2 -translate-y-1/2 p-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-400 rounded-full transition-all hover:scale-110 disabled:opacity-30 z-30 shadow-md border border-amber-500/20 backdrop-blur-sm"
+          title="لاپەڕێ پێشتر"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </button>
+        <button 
+          onClick={nextPage}
+          disabled={page === 604}
+          className="absolute right-10 top-1/2 -translate-y-1/2 p-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-400 rounded-full transition-all hover:scale-110 disabled:opacity-30 z-30 shadow-md border border-amber-500/20 backdrop-blur-sm"
+          title="لاپەڕێ پاشتر"
+        >
+          <ChevronRight className="w-5 h-5 rotate-180" />
+        </button>
+
+        {/* Interactive Tafsir & AI Image slide-up drawer */}
+        <AnimatePresence>
+          {selectedVerse && (
+            <motion.div
+              initial={{ y: '100%', opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className={`absolute bottom-0 left-0 right-0 max-h-[78%] overflow-y-auto border-t shadow-[0_-12px_40px_rgba(0,0,0,0.18)] z-40 rounded-t-[2.5rem] backdrop-blur-md flex flex-col transition-all duration-300 ${
+                isDarkMode ? 'bg-slate-900/95 border-slate-800 text-slate-100' : 'bg-white/95 border-amber-600/15 text-slate-950'
+              }`}
+            >
+              {/* Drawer Header */}
+              <div className={`p-4 sm:p-5 border-b flex items-center justify-between sticky top-0 z-10 backdrop-blur-md ${
+                isDarkMode ? 'border-slate-800/80 bg-slate-900/80' : 'border-slate-100 bg-slate-50/80'
+              }`}>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      const isPlaying = playingVerseKey === selectedVerse.verse_key;
+                      if (isPlaying) {
+                        playAudio(undefined, 'verse', selectedVerse.verse_key);
+                      } else {
+                        playAudio(selectedVerse.audio_url, 'verse', selectedVerse.verse_key);
+                      }
+                    }}
+                    className={`w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-md hover:scale-105 active:scale-95 ${
+                      playingVerseKey === selectedVerse.verse_key
+                        ? 'bg-amber-500 text-white animate-pulse'
+                        : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                    }`}
+                    title="گوهداریکرنا ئایەتێ"
+                  >
+                    {playingVerseKey === selectedVerse.verse_key ? (
+                      <Pause className="w-5 h-5" />
+                    ) : (
+                      <Play className="w-5 h-5 ml-0.5" />
+                    )}
+                  </button>
+                  <div className="text-right">
+                    <h4 className="font-extrabold text-sm sm:text-base text-amber-800 dark:text-amber-400">ئایەتا {selectedVerse.verse_key}</h4>
+                    <p className="text-[10px] sm:text-xs opacity-60">تەفسیرا کوردی و وێنێ ژیرییا دەستکرد</p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setSelectedVerse(null)}
+                  className={`p-2 rounded-full transition-all ${
+                    isDarkMode ? 'hover:bg-slate-800 text-slate-400 hover:text-slate-200' : 'hover:bg-slate-200 text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  <Plus className="w-6 h-6 rotate-45" />
+                </button>
+              </div>
+
+              {/* Drawer Content Body */}
+              <div className="p-4 sm:p-6 space-y-6 md:space-y-0 md:grid md:grid-cols-2 md:gap-6 overflow-y-auto">
+                
+                {/* 1. Kurmanji Badini Tafsir Panel */}
+                <div className={`space-y-4 p-5 rounded-2xl border ${
+                  isDarkMode ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50/50 border-zinc-100'
+                }`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <MessageCircle className="w-5 h-5 text-emerald-600" />
+                    <h5 className="font-extrabold text-sm sm:text-base text-emerald-600 dark:text-emerald-400">تەفسیرا بادینی</h5>
+                  </div>
+                  
+                  {tafsirData[selectedVerse.verse_key] ? (
+                    <p className="text-sm sm:text-base leading-relaxed text-right whitespace-pre-line font-medium" dir="rtl">
+                      {tafsirData[selectedVerse.verse_key]}
+                    </p>
+                  ) : isLoadingTafsir[selectedVerse.verse_key] ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <Loader2 className="w-8 h-8 text-emerald-500 animate-spin mb-3" />
+                      <p className="text-xs opacity-70 animate-pulse">تەفسیر دهێتە ئامادەکرن ب زمانێ کوردی...</p>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-xs opacity-60 mb-4">چ تەفسیر بۆ ڤێ ئایەتێ نینە.</p>
+                      <button
+                        onClick={() => handleGetTafsir(selectedVerse.verse_key, selectedVerse.words)}
+                        className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-sm inline-flex items-center gap-2"
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                        وەرگرتنا تەفسیرێ (AI)
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. AI Illustration Image Panel */}
+                <div className={`space-y-4 p-5 rounded-2xl border ${
+                  isDarkMode ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50/50 border-zinc-100'
+                }`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <ImageIcon className="w-5 h-5 text-amber-500" />
+                    <h5 className="font-extrabold text-sm sm:text-base text-amber-600 dark:text-amber-400">تەفسیر ب وێنە (AI)</h5>
+                  </div>
+
+                  {generatedImages[selectedVerse.verse_key] ? (
+                    <div className="relative rounded-2xl overflow-hidden shadow-md border border-amber-500/10 max-w-md mx-auto aspect-video">
+                      <img 
+                        src={generatedImages[selectedVerse.verse_key]} 
+                        alt={`Illustration for ${selectedVerse.verse_key}`}
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-3">
+                        <span className="text-[10px] text-white/80 font-bold font-mono">Generative Image by Gemini</span>
+                      </div>
+                    </div>
+                  ) : isGeneratingImage[selectedVerse.verse_key] ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <Loader2 className="w-8 h-8 text-amber-500 animate-spin mb-3" />
+                      <p className="text-xs opacity-70 animate-pulse">وێنە دهێتە دروستکرن ب رێکا ژیرییا دەستکرد...</p>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-xs opacity-60 mb-4">چ وێنە بۆ ڤێ ئایەتێ نەهاتینە دروستکرن.</p>
+                      <button
+                        onClick={() => handleGenerateImage(selectedVerse.verse_key, selectedVerse.words)}
+                        className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-sm inline-flex items-center gap-2"
+                      >
+                        <ImageIcon className="w-4 h-4" />
+                        دروستکرنا وێنەی (AI Image)
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
       </div>
 
       <div className="flex flex-col items-center gap-2 text-[10px] sm:text-xs text-zinc-400 text-center px-4">
-        <p>بۆ لاپەڕێ دی: لایێ چەپێ یان ڕاستێ یێ لاپەڕەی کلیک بکە</p>
-        <p className="opacity-50">قورئانا پیرۆز - ٦٠٤ لاپەڕە</p>
+        <p className="font-medium">بۆ لاپەڕێ دی: ل سەر پەرێن چەپێ یان ڕاستێ یێن ڕوخسارێ قورئانێ کلیک بکە</p>
+        <p className="opacity-50 font-bold">قورئانا پیرۆز ب شێوازێ لاپەر - ٦٠٤ لاپەڕە</p>
       </div>
     </div>
   );
@@ -367,7 +722,7 @@ export default function App() {
 
   // Dark Mode & Font Size State
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('dark_mode') === 'true');
-  const [fontSize, setFontSize] = useState(() => Number(localStorage.getItem('font_size')) || 28);
+  const [fontSize, setFontSize] = useState(() => Number(localStorage.getItem('font_size')) || 24);
 
   useEffect(() => {
     localStorage.setItem('dark_mode', isDarkMode.toString());
@@ -964,7 +1319,7 @@ export default function App() {
     setIsGeneratingImage(prev => ({ ...prev, [verseKey]: true }));
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
+        model: 'gemini-3.1-flash-lite-image',
         contents: {
           parts: [
             {
@@ -1487,7 +1842,28 @@ export default function App() {
         )}
 
         {/* Dictionary Tab */}
-        {activeTab === 'mushaf' && <MushafView page={mushafPage} setPage={setMushafPage} fontSize={fontSize} selectedFont={selectedFont} showTajweed={showTajweed} />}
+        {activeTab === 'mushaf' && (
+          <MushafView 
+            page={mushafPage} 
+            setPage={setMushafPage} 
+            fontSize={fontSize} 
+            selectedFont={selectedFont} 
+            showTajweed={showTajweed}
+            isDarkMode={isDarkMode}
+            selectedReciter={selectedReciter}
+            playAudio={playAudio}
+            playingWordId={playingWordId}
+            playingVerseKey={playingVerseKey}
+            tafsirData={tafsirData}
+            isLoadingTafsir={isLoadingTafsir}
+            generatedImages={generatedImages}
+            isGeneratingImage={isGeneratingImage}
+            handleGetTafsir={handleGetTafsir}
+            handleGenerateImage={handleGenerateImage}
+            getCorrectWordAudioUrl={getCorrectWordAudioUrl}
+            cleanTajweed={cleanTajweed}
+          />
+        )}
         {activeTab === 'dictionary' && (
           <div className={`${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200/60'} p-6 md:p-8 rounded-3xl shadow-sm border transition-colors`}>
             <form onSubmit={handleSearch} className="max-w-2xl mx-auto mb-8">
