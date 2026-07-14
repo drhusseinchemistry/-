@@ -303,14 +303,14 @@ function MushafView({
           isQuranFullScreen
             ? `relative transition-all duration-300 group select-none ${
                 isFullScreenLandscape 
-                  ? 'w-full h-full max-h-none aspect-none rounded-none border-0 p-3 sm:p-5' 
-                  : 'w-full h-auto max-h-[96vh] md:h-[95vh] md:w-auto aspect-[1/1.42] sm:aspect-[1/1.41] rounded-2xl md:rounded-3xl shadow-2xl border p-3 sm:p-5'
+                  ? 'w-full h-full max-h-none aspect-none rounded-none border-0 p-0' 
+                  : 'w-full h-auto max-h-[96vh] md:h-[95vh] md:w-auto aspect-[1/1.42] sm:aspect-[1/1.41] rounded-2xl md:rounded-3xl shadow-2xl border p-0'
               } ${
                 isDarkMode 
                   ? 'bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 border-amber-900/40 text-slate-100' 
                   : 'bg-[#fcf9f2] border-amber-900/20 text-zinc-900'
               }`
-            : `relative w-full aspect-[1/1.42] sm:aspect-[1/1.41] rounded-3xl shadow-[0_15px_40px_rgba(0,0,0,0.12)] border overflow-hidden transition-all duration-300 group p-3 sm:p-5 cursor-zoom-in ${
+            : `relative w-full aspect-[1/1.42] sm:aspect-[1/1.41] rounded-3xl shadow-[0_15px_40px_rgba(0,0,0,0.12)] border overflow-hidden transition-all duration-300 group p-0 cursor-zoom-in ${
                 isDarkMode 
                   ? 'bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 border-amber-900/30' 
                   : 'bg-[#fcf9f2] border-amber-900/15'
@@ -346,8 +346,8 @@ function MushafView({
         <CornerOrnament position="bottom-right" />
 
         {/* The Text & Content Area inside the Borders */}
-        <div className={`w-full h-full flex flex-col justify-between overflow-y-auto relative transition-all ${
-          isFullScreenLandscape ? 'p-2 sm:p-4 md:p-6' : 'p-4 sm:p-8'
+        <div className={`absolute inset-0 flex flex-col justify-between overflow-y-auto transition-all ${
+          isFullScreenLandscape ? 'p-5 sm:p-9 md:p-11' : 'p-7 sm:p-12'
         }`}>
           
           {/* Dynamic Page Header (Surah and Juz) */}
@@ -814,7 +814,7 @@ function MushafView({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className={`fixed inset-0 z-50 flex flex-col justify-center items-center w-full h-full select-none ${
+            className={`fixed inset-0 z-50 flex flex-col justify-center items-center w-full h-[100dvh] select-none ${
               isLandscape ? 'p-0' : 'p-2 sm:p-4 md:p-6'
             } ${
               isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-[#faf8f5] text-zinc-900'
