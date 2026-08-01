@@ -166,31 +166,6 @@ export async function getSurahFromDB(surahId: number, reciterId: number): Promis
   return null;
 }
 
-// Pre-cache fonts into CacheStorage for full offline typography support
-export async function cacheFontsOffline(): Promise<void> {
-  if (!('caches' in window)) return;
-  try {
-    const fontCache = await caches.open('quran-fonts-v1');
-    const fontUrls = [
-      '/fonts/UthmanicHafs.otf',
-      'https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Scheherazade+New:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&family=Amiri:wght@400;700&display=swap'
-    ];
-    for (const fontUrl of fontUrls) {
-      try {
-        const existing = await fontCache.match(fontUrl);
-        if (!existing) {
-          const response = await fetch(fontUrl);
-          if (response.ok) {
-            await fontCache.put(fontUrl, response);
-          }
-        }
-      } catch (e) {}
-    }
-  } catch (err) {
-    console.warn('Font offline cache failed:', err);
-  }
-}
-
 // Get CacheStorage instance
 async function getCacheStorage(isWbw: boolean): Promise<Cache | null> {
   if ('caches' in window) {

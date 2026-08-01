@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Search, Book, List as ListIcon, Loader2, BookOpen, ChevronRight, Key, Save, Check, Play, Volume2, MessageCircle, BookHeart, Pause, Image as ImageIcon, Download, Sun, Moon, Type as TypeIcon, Plus, Minus, Minimize2, DownloadCloud, CheckCircle2, X } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 import { motion, AnimatePresence } from 'motion/react';
-import { getPageFromDB, savePageToDB, getSurahFromDB, saveSurahToDB, getCachedAudioBlobUrl, cacheAudioFile, cacheFontsOffline } from './utils/offlineQuran';
+import { getPageFromDB, savePageToDB, getSurahFromDB, saveSurahToDB, getCachedAudioBlobUrl, cacheAudioFile } from './utils/offlineQuran';
 
 const commonWords = [
   { word: 'ٱللَّهُ', meaning: 'خودێ' },
@@ -57,50 +57,12 @@ const commonWords = [
   { word: 'هُدًى', meaning: 'رێنمایی / هیدایەت' }
 ];
 
-const ISOLATED_OR_RIGHT_ONLY = new Set([
-  'ا', 'أ', 'إ', 'آ', 'ٱ', 'د', 'ذ', 'ر', 'ز', 'و', 'ؤ', 'ة', 'ۦ', 'ۥ', ' ',
-  '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩', '٠', 'ۚ', 'ۗ', 'ۖ', 'ۛ', 'ۜ', 'ۣ'
-]);
-
-const isJoiningChar = (ch: string) => {
-  if (!ch) return false;
-  return !ISOLATED_OR_RIGHT_ONLY.has(ch);
-};
-
 const cleanTajweed = (text: string) => {
   if (!text) return '';
   let cleaned = text.replace(/\u25CF/g, '');
-
-  // Normalize <rule class=...> and <tajweed class=...> to <span class="...">
-  cleaned = cleaned
-    .replace(/<(rule|tajweed)\s+class=["']?([^"'\s>]+)["']?>/g, '<span class="$2">')
-    .replace(/<\/(rule|tajweed)>/g, '</span>');
-
-  // Insert Zero-Width Joiner (\u200D) at tag boundaries so WebKit/CoreText (iOS Safari)
-  // maintains cursive Arabic letter joining across colored span tags
-  const ZWJ = '\u200D';
-
-  // Add ZWJ inside spans where content starts or ends with joining characters
-  cleaned = cleaned.replace(/(<span\s+class="[^"]+">)([^<]+)(<\/span>)/g, (match, openTag, content, closeTag) => {
-    const trimmed = content.trim();
-    if (!trimmed) return match;
-    const firstChar = trimmed[0];
-    const lastChar = trimmed[trimmed.length - 1];
-
-    const prefix = isJoiningChar(firstChar) ? ZWJ : '';
-    const suffix = isJoiningChar(lastChar) ? ZWJ : '';
-
-    return openTag + prefix + content + suffix + closeTag;
-  });
-
-  // If span ends with ZWJ and is immediately followed by a joining character outside span, insert ZWJ before that char
-  cleaned = cleaned.replace(/(<\/span>)([\u0600-\u06FF])/g, (match, closeTag, nextChar) => {
-    if (isJoiningChar(nextChar)) {
-      return closeTag + ZWJ + nextChar;
-    }
-    return match;
-  });
-
+  // Transform non-standard <rule class=...> tags into standard <span class="..."> tags for WebKit/iOS Safari compatibility
+  cleaned = cleaned.replace(/<rule\s+class=["']?([^"'\s>]+)["']?>/g, '<span class="$1">');
+  cleaned = cleaned.replace(/<\/rule>/g, '</span>');
   return cleaned;
 };
 
@@ -1318,9 +1280,8 @@ export default function App() {
     };
   });
 
-  // Prompt on first app load for offline downloads & pre-cache fonts
+  // Prompt on first app load for offline downloads
   useEffect(() => {
-    cacheFontsOffline().catch(() => {});
     const hasPrompted = localStorage.getItem('wbw_offline_prompt_shown');
     const isTextComp = localStorage.getItem('text_offline_completed') === 'true';
     const isAudioComp = localStorage.getItem('wbw_offline_completed') === 'true';
@@ -1334,9 +1295,6 @@ export default function App() {
   const startTextDownload = async () => {
     setTextDownloadStatus(prev => ({ ...prev, isDownloading: true, isPaused: false }));
     textCancelRef.current = false;
-
-    // Cache local fonts first
-    await cacheFontsOffline();
 
     let startP = textDownloadStatus.currentPage > 0 && textDownloadStatus.currentPage < 604
       ? textDownloadStatus.currentPage
@@ -2576,92 +2534,6 @@ export default function App() {
 
       {/* Main Content */}
       <main className="max-w-5xl mx-auto px-4 py-8">
-        {/* Top Offline Download Banner */}
-        {(!textDownloadStatus.isComplete || !wbwDownloadStatus.isComplete || textDownloadStatus.isDownloading || wbwDownloadStatus.isDownloading) && (
-          <div className="mb-6">
-            <div className={`p-4 sm:p-5 rounded-2xl border shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 transition-all ${
-              (textDownloadStatus.isDownloading || wbwDownloadStatus.isDownloading)
-                ? 'bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-200'
-                : (isDarkMode ? 'bg-slate-800/90 border-slate-700 text-slate-200' : 'bg-emerald-50/90 border-emerald-200/80 text-emerald-900')
-            }`}>
-              <div className="flex items-center gap-3 text-right w-full md:w-auto">
-                <div className={`p-2.5 rounded-xl shrink-0 ${
-                  (textDownloadStatus.isDownloading || wbwDownloadStatus.isDownloading)
-                    ? 'bg-amber-500 text-white animate-pulse'
-                    : 'bg-emerald-600 text-white'
-                }`}>
-                  <DownloadCloud className="w-5 h-5 sm:w-6 sm:h-6" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-sm sm:text-base">
-                    {(textDownloadStatus.isDownloading && wbwDownloadStatus.isDownloading)
-                      ? `داونلۆدکرنا نڤیسین (%${textDownloadStatus.percent}) و دەنگ (%${wbwDownloadStatus.percent})...`
-                      : textDownloadStatus.isDownloading
-                      ? `داونلۆدکرنا نڤیسینا قورئانێ و فۆنتان: %${textDownloadStatus.percent} (پەڕە ${textDownloadStatus.currentPage} ژ ٦٠٤)`
-                      : wbwDownloadStatus.isDownloading
-                      ? `داونلۆدکرنا دەنگێ پەیڤ ب پەیڤ: %${wbwDownloadStatus.percent} (پەڕە ${wbwDownloadStatus.currentPage} ژ ٦٠٤)`
-                      : 'ئەرێ تە دڤێت نڤیسینا قورئانێ و دەنگی بۆ بکارئینانا ئۆفلاین داونلۆد بکەی؟'}
-                  </h4>
-                  <p className="text-xs opacity-80 mt-0.5">
-                    دەمێ داونلۆد دکەی، نڤیسین و فۆنت و دەنگ هەمی ل سەر ئامێرێ تە رزگار دبن و ب ئۆفلاین کاردکەن.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end w-full md:w-auto">
-                {!textDownloadStatus.isComplete && (
-                  textDownloadStatus.isDownloading ? (
-                    <button
-                      onClick={pauseTextDownload}
-                      className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
-                    >
-                      وەستاندنا نڤیسینێ
-                    </button>
-                  ) : (
-                    <button
-                      onClick={startTextDownload}
-                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
-                    >
-                      <BookOpen className="w-4 h-4" />
-                      داونلۆدکرنا نڤیسینێ (%{textDownloadStatus.percent})
-                    </button>
-                  )
-                )}
-
-                {!wbwDownloadStatus.isComplete && (
-                  wbwDownloadStatus.isDownloading ? (
-                    <button
-                      onClick={pauseWbwDownload}
-                      className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
-                    >
-                      وەستاندنا دەنگی
-                    </button>
-                  ) : (
-                    <button
-                      onClick={startWbwDownload}
-                      className="px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
-                    >
-                      <Volume2 className="w-4 h-4" />
-                      داونلۆدکرنا دەنگی (%{wbwDownloadStatus.percent})
-                    </button>
-                  )
-                )}
-
-                {(!textDownloadStatus.isComplete || !wbwDownloadStatus.isComplete) && !textDownloadStatus.isDownloading && !wbwDownloadStatus.isDownloading && (
-                  <button
-                    onClick={() => {
-                      if (!textDownloadStatus.isComplete) startTextDownload();
-                      if (!wbwDownloadStatus.isComplete) startWbwDownload();
-                    }}
-                    className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
-                  >
-                    داونلۆدکرنا هەردووکان
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
         {/* API Key Section */}
         <div className={`${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200/60'} p-4 rounded-2xl shadow-sm border mb-6 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between transition-colors`}>
           <div className="flex items-center gap-3 w-full md:w-auto">
@@ -3263,7 +3135,7 @@ export default function App() {
                         </div>
                       )}
                       
-                      <div className="quran-text text-right mb-6 select-none" dir="rtl" style={{ fontFamily: selectedFont, fontSize: `${fontSize}px`, lineHeight: '2.4em' }}>
+                      <div className="flex flex-wrap gap-y-6 gap-x-3 justify-start mb-6 text-right leading-loose" dir="rtl">
                         {verse.words?.map((word: any) => {
                           const hasAudio = !!word.audio_url && 
                                            word.char_type_name !== 'end' && 
@@ -3277,33 +3149,31 @@ export default function App() {
                                            word.text_uthmani !== 'ۚ';
                           const isPlaying = playingWordId === word.id;
                           return (
-                            <React.Fragment key={word.id}>
-                              <span 
-                                onClick={() => {
-                                  if (hasAudio) {
-                                    const correctUrl = getCorrectWordAudioUrl(word, verse.words, verse.verse_key);
-                                    playAudio(correctUrl, 'word', word.id);
-                                  }
-                                }}
-                                className={`inline quran-word select-none transition-all duration-200 ${
-                                  !showTajweed ? 'no-tajweed-colors' : ''
-                                } ${
-                                  isDarkMode ? 'dark-mode-text' : ''
-                                } ${
-                                  hasAudio 
-                                    ? 'cursor-pointer hover:text-emerald-500 hover:bg-emerald-500/10 rounded px-1' 
-                                    : ''
-                                } ${
-                                  isPlaying 
-                                    ? (isDarkMode ? 'bg-emerald-950 text-emerald-400 font-bold border-b-2 border-emerald-500' : 'bg-emerald-50 text-emerald-700 font-bold border-b-2 border-emerald-500') 
-                                    : ''
-                                }`} 
-                                style={{ fontFamily: selectedFont, fontSize: `${fontSize}px` }}
-                                dangerouslySetInnerHTML={{ __html: cleanTajweed(showTajweed ? (word.text_uthmani_tajweed || word.text_uthmani) : word.text_uthmani) }}
-                                title={hasAudio ? "بۆ گوهداریکرنێ کلیک بکە" : undefined}
-                              />
-                              {' '}
-                            </React.Fragment>
+                            <span 
+                              key={word.id}
+                              onClick={() => {
+                                if (hasAudio) {
+                                  const correctUrl = getCorrectWordAudioUrl(word, verse.words, verse.verse_key);
+                                  playAudio(correctUrl, 'word', word.id);
+                                }
+                              }}
+                              className={`inline quran-text select-none transition-all duration-200 ${
+                                !showTajweed ? 'no-tajweed-colors' : ''
+                              } ${
+                                isDarkMode ? 'dark-mode-text' : ''
+                              } ${
+                                hasAudio 
+                                  ? 'cursor-pointer hover:text-emerald-500 hover:bg-emerald-500/10 rounded px-1' 
+                                  : ''
+                              } ${
+                                isPlaying 
+                                  ? (isDarkMode ? 'bg-emerald-950 text-emerald-400 font-bold border-b-2 border-emerald-500' : 'bg-emerald-50 text-emerald-700 font-bold border-b-2 border-emerald-500') 
+                                  : ''
+                              }`} 
+                              style={{ fontFamily: selectedFont, fontSize: `${fontSize}px` }}
+                              dangerouslySetInnerHTML={{ __html: cleanTajweed(showTajweed ? (word.text_uthmani_tajweed || word.text_uthmani) : word.text_uthmani) }}
+                              title={hasAudio ? "بۆ گوهداریکرنێ کلیک بکە" : undefined}
+                            />
                           );
                         })}
                         <span className="inline-flex items-center justify-center w-8 h-8 rounded-full border-2 border-emerald-500 text-emerald-600 text-sm font-bold mx-2">
@@ -3496,7 +3366,7 @@ export default function App() {
                             <span>خوێندنا دەنگی</span>
                           </div>
                         )}
-                        <div className="quran-text text-right mb-6 select-none" dir="rtl" style={{ fontFamily: selectedFont, fontSize: `${fontSize}px`, lineHeight: '2.4em' }}>
+                        <div className="flex flex-wrap gap-y-6 gap-x-3 justify-start mb-6 text-right leading-loose" dir="rtl">
                           {verse.words?.map((word: any) => {
                             const hasAudio = !!word.audio_url && 
                                              word.char_type_name !== 'end' && 
@@ -3510,33 +3380,31 @@ export default function App() {
                                              word.text_uthmani !== 'ۚ';
                             const isPlaying = playingWordId === word.id;
                             return (
-                              <React.Fragment key={word.id}>
-                                <span 
-                                  onClick={() => {
-                                    if (hasAudio) {
-                                      const correctUrl = getCorrectWordAudioUrl(word, verse.words, verse.verse_key);
-                                      playAudio(correctUrl, 'word', word.id);
-                                    }
-                                  }}
-                                  className={`inline quran-word select-none transition-all duration-200 ${
-                                    !showTajweed ? 'no-tajweed-colors' : ''
-                                  } ${
-                                    isDarkMode ? 'dark-mode-text' : ''
-                                  } ${
-                                    hasAudio 
-                                      ? 'cursor-pointer hover:text-emerald-500 hover:bg-emerald-500/10 rounded px-1' 
-                                      : ''
-                                  } ${
-                                    isPlaying 
-                                      ? (isDarkMode ? 'bg-emerald-950 text-emerald-400 font-bold border-b-2 border-emerald-500' : 'bg-emerald-50 text-emerald-700 font-bold border-b-2 border-emerald-500') 
-                                      : ''
-                                  }`} 
-                                  style={{ fontFamily: selectedFont, fontSize: `${fontSize}px` }}
-                                  dangerouslySetInnerHTML={{ __html: cleanTajweed(showTajweed ? (word.text_uthmani_tajweed || word.text_uthmani) : word.text_uthmani) }}
-                                  title={hasAudio ? "بۆ گوهداریکرنێ کلیک بکە" : undefined}
-                                />
-                                {' '}
-                              </React.Fragment>
+                              <span 
+                                key={word.id}
+                                onClick={() => {
+                                  if (hasAudio) {
+                                    const correctUrl = getCorrectWordAudioUrl(word, verse.words, verse.verse_key);
+                                    playAudio(correctUrl, 'word', word.id);
+                                  }
+                                }}
+                                className={`inline quran-text select-none transition-all duration-200 ${
+                                  !showTajweed ? 'no-tajweed-colors' : ''
+                                } ${
+                                  isDarkMode ? 'dark-mode-text' : ''
+                                } ${
+                                  hasAudio 
+                                    ? 'cursor-pointer hover:text-emerald-500 hover:bg-emerald-500/10 rounded px-1' 
+                                    : ''
+                                } ${
+                                  isPlaying 
+                                    ? (isDarkMode ? 'bg-emerald-950 text-emerald-400 font-bold border-b-2 border-emerald-500' : 'bg-emerald-50 text-emerald-700 font-bold border-b-2 border-emerald-500') 
+                                    : ''
+                                }`} 
+                                style={{ fontFamily: selectedFont, fontSize: `${fontSize}px` }}
+                                dangerouslySetInnerHTML={{ __html: cleanTajweed(showTajweed ? (word.text_uthmani_tajweed || word.text_uthmani) : word.text_uthmani) }}
+                                title={hasAudio ? "بۆ گوهداریکرنێ کلیک بکە" : undefined}
+                              />
                             );
                           })}
                           <span className="inline-flex items-center justify-center w-8 h-8 rounded-full border-2 border-emerald-500 text-emerald-600 text-sm font-bold mx-2">
@@ -3775,7 +3643,7 @@ export default function App() {
                               <span>نوکە دهێتە خواندن</span>
                             </div>
                           )}
-                          <div className="quran-text text-right mb-2 select-none" dir="rtl" style={{ fontFamily: selectedFont, fontSize: `${fontSize}px`, lineHeight: '2.4em' }}>
+                          <div className="flex flex-wrap gap-y-6 gap-x-3 justify-start mb-2 text-right leading-loose" dir="rtl">
                             {verse.words?.map((word: any) => {
                               const hasAudio = !!word.audio_url && 
                                                word.char_type_name !== 'end' && 
@@ -3789,34 +3657,32 @@ export default function App() {
                                                word.text_uthmani !== 'ۚ';
                               const isPlaying = playingWordId === word.id;
                               return (
-                                <React.Fragment key={word.id}>
-                                  <span 
-                                    onClick={(e) => {
-                                      if (hasAudio) {
-                                        e.stopPropagation();
-                                        const correctUrl = getCorrectWordAudioUrl(word, verse.words, verse.verse_key);
-                                        playAudio(correctUrl, 'word', word.id);
-                                      }
-                                    }}
-                                    className={`inline quran-word select-none transition-all duration-200 ${
-                                      !showTajweed ? 'no-tajweed-colors' : ''
-                                    } ${
-                                      isDarkMode ? 'dark-mode-text' : ''
-                                    } ${
-                                      hasAudio 
-                                        ? 'cursor-pointer hover:text-emerald-500 hover:bg-emerald-500/10 rounded px-1' 
-                                        : ''
-                                    } ${
-                                      isPlaying 
-                                        ? (isDarkMode ? 'bg-emerald-950 text-emerald-400 font-bold border-b-2 border-emerald-500' : 'bg-emerald-50 text-emerald-700 font-bold border-b-2 border-emerald-500') 
-                                        : ''
-                                    }`} 
-                                    style={{ fontFamily: selectedFont, fontSize: `${fontSize}px` }}
-                                    dangerouslySetInnerHTML={{ __html: cleanTajweed(showTajweed ? (word.text_uthmani_tajweed || word.text_uthmani) : word.text_uthmani) }}
-                                    title={hasAudio ? "بۆ گوهداریکرنێ کلیک بکە" : undefined}
-                                  />
-                                  {' '}
-                                </React.Fragment>
+                                <span 
+                                  key={word.id}
+                                  onClick={(e) => {
+                                    if (hasAudio) {
+                                      e.stopPropagation();
+                                      const correctUrl = getCorrectWordAudioUrl(word, verse.words, verse.verse_key);
+                                      playAudio(correctUrl, 'word', word.id);
+                                    }
+                                  }}
+                                  className={`inline quran-text select-none transition-all duration-200 ${
+                                    !showTajweed ? 'no-tajweed-colors' : ''
+                                  } ${
+                                    isDarkMode ? 'dark-mode-text' : ''
+                                  } ${
+                                    hasAudio 
+                                      ? 'cursor-pointer hover:text-emerald-500 hover:bg-emerald-500/10 rounded px-1' 
+                                      : ''
+                                  } ${
+                                    isPlaying 
+                                      ? (isDarkMode ? 'bg-emerald-950 text-emerald-400 font-bold border-b-2 border-emerald-500' : 'bg-emerald-50 text-emerald-700 font-bold border-b-2 border-emerald-500') 
+                                      : ''
+                                  }`} 
+                                  style={{ fontFamily: selectedFont, fontSize: `${fontSize}px` }}
+                                  dangerouslySetInnerHTML={{ __html: cleanTajweed(showTajweed ? (word.text_uthmani_tajweed || word.text_uthmani) : word.text_uthmani) }}
+                                  title={hasAudio ? "بۆ گوهداریکرنێ کلیک بکە" : undefined}
+                                />
                               );
                             })}
                             <span className="inline-flex items-center justify-center w-8 h-8 rounded-full border-2 border-emerald-500 text-emerald-600 text-sm font-bold mx-2">
