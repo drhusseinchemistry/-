@@ -3,7 +3,15 @@
 
 @font-face {
   font-family: 'Uthmanic Hafs';
-  src: url('kfgqpc-uthmanic-script-hafs-regular/arabic.otf') format('opentype');
+  src: url('/fonts/UthmanicHafs.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Arabic';
+  src: url('/fonts/UthmanicHafs.otf') format('opentype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -17,16 +25,19 @@
 .quran-text,
 .quran-word {
   /* Default font, can be overridden by inline styles */
-  font-family: 'Uthmanic Hafs', 'Amiri Quran', 'Traditional Arabic', serif;
+  font-family: 'Uthmanic Hafs', 'Amiri Quran', 'Scheherazade New', 'Noto Naskh Arabic', serif;
   color: #1e293b; /* text-slate-800 */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-  font-variant-ligatures: common-ligatures discretionary-ligatures historical-ligatures contextual;
+  font-variant-ligatures: normal common-ligatures discretionary-ligatures historical-ligatures contextual;
   font-feature-settings: "liga" 1, "calt" 1, "mset" 1, "clig" 1, "rlig" 1;
+  -webkit-font-feature-settings: "liga" 1, "calt" 1, "mset" 1, "clig" 1, "rlig" 1;
   -webkit-text-size-adjust: 100%;
   direction: rtl;
   unicode-bidi: isolate;
+  word-spacing: normal;
+  letter-spacing: normal;
 }
 
 /* Fix WebKit / iOS Safari inline element font shaping and letter joining across Tajweed tags */
@@ -61,6 +72,7 @@
 .quran-word [class*="laam_shamsiyah"],
 .quran-word [class*="custom-alef-maksora"] {
   display: inline !important;
+  unicode-bidi: normal !important;
   white-space: inherit !important;
   font-family: inherit !important;
   font-size: inherit !important;
