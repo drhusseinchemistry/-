@@ -404,6 +404,7 @@ function MushafView({
   playAudio,
   playingWordId,
   playingVerseKey,
+  playingWordLocation,
   tafsirData,
   isLoadingTafsir,
   generatedImages,
@@ -428,6 +429,7 @@ function MushafView({
   playAudio: (url: string | undefined, type: 'word' | 'verse', id: string | number) => void;
   playingWordId: number | null;
   playingVerseKey: string | null;
+  playingWordLocation?: string | null;
   tafsirData: Record<string, string>;
   isLoadingTafsir: Record<string, boolean>;
   generatedImages: Record<string, string>;
@@ -659,7 +661,7 @@ function MushafView({
                   }`}>
                     {verse.words?.map((word: any) => {
                       if (word.char_type_name === 'end') return null;
-                      const isWordPlaying = playingWordId === word.id;
+                      const isWordPlaying = playingWordId === word.id || (!!playingWordLocation && playingWordLocation === `${verse.verse_key}:${word.position}`);
                       const hasAudio = !!word.audio_url;
 
                       return (
@@ -673,10 +675,6 @@ function MushafView({
                               }
                             }}
                             className={`inline-block quran-word select-none mx-0.5 sm:mx-1 my-1 transition-all hover:scale-110 active:scale-95 ${
-                              isWordPlaying 
-                                ? 'text-amber-500 scale-110 font-extrabold' 
-                                : ''
-                            } ${
                               isDarkMode ? 'dark-mode-text' : ''
                             } ${
                               hasAudio 
@@ -684,7 +682,7 @@ function MushafView({
                                 : ''
                             } ${
                               isWordPlaying 
-                                ? (isDarkMode ? 'bg-emerald-950 text-emerald-400 font-bold border-b-2 border-emerald-500 scale-105' : 'bg-emerald-50 text-emerald-700 font-bold border-b-2 border-emerald-500 scale-105') 
+                                ? (isDarkMode ? 'bg-cyan-500/35 text-cyan-200 font-extrabold ring-2 ring-cyan-400/80 rounded px-1.5 py-0.5 scale-110 shadow-sm' : 'bg-cyan-500/25 text-cyan-900 font-extrabold ring-2 ring-cyan-500/80 rounded px-1.5 py-0.5 scale-110 shadow-sm') 
                                 : ''
                             }`}
                             dangerouslySetInnerHTML={{ __html: cleanTajweed(showTajweed ? (word.text_uthmani_tajweed || word.text_uthmani) : word.text_uthmani) }}
@@ -1205,6 +1203,12 @@ export default function App() {
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
   const [playingWordId, setPlayingWordId] = useState<number | null>(null);
   const [playingVerseKey, setPlayingVerseKey] = useState<string | null>(null);
+  const [playingWordLocation, setPlayingWordLocation] = useState<string | null>(null);
+  const playingWordLocationRef = React.useRef<string | null>(null);
+  playingWordLocationRef.current = playingWordLocation;
+
+  const qdcVerseTimingsRef = React.useRef<any[]>([]);
+  const qdcChapterAudioUrlRef = React.useRef<string | null>(null);
   const [tafsirData, setTafsirData] = useState<Record<string, string>>({});
   const [isLoadingTafsir, setIsLoadingTafsir] = useState<Record<string, boolean>>({});
   const [generatedImages, setGeneratedImages] = useState<Record<string, string>>({});
@@ -1452,6 +1456,12 @@ export default function App() {
   const nextAudioPreloadRef = React.useRef<HTMLAudioElement | null>(null);
   const playingVerseIndexRef = React.useRef<number | null>(null);
   const resolvedUrlsMapRef = React.useRef<Map<string, string>>(new Map());
+
+  const continuousVerseIndexRef = React.useRef<number>(0);
+  continuousVerseIndexRef.current = continuousVerseIndex;
+
+  const playingVerseKeyRef = React.useRef<string | null>(null);
+  playingVerseKeyRef.current = playingVerseKey;
 
   const continuousVersesRef = React.useRef<any[]>([]);
   continuousVersesRef.current = continuousVerses;
@@ -1761,6 +1771,7 @@ export default function App() {
       playingVerseIndexRef.current = null;
       setIsContinuousAudioPlaying(false);
       setIsAutoScrolling(false);
+      setPlayingWordLocation(null);
       return;
     }
 
@@ -1774,20 +1785,114 @@ export default function App() {
 
     if (continuousVerses.length === 0) return;
 
-    // Check if end of Surah
-    if (continuousVerseIndex >= continuousVerses.length) {
-      if (continuousSurahObj && continuousSurahObj.id < 114) {
-        const nextSurah = surahs.find(s => s.id === continuousSurahObj.id + 1);
-        if (nextSurah) {
-          loadContinuousSurah(nextSurah, true);
+    // Synchronize timeupdate for word-by-word highlighting and active verse tracking
+    const setupTimeUpdate = (audioEl: HTMLAudioElement) => {
+      audioEl.ontimeupdate = () => {
+        if (audioEl.paused) return;
+        const currentMs = audioEl.currentTime * 1000;
+        const vTimings = qdcVerseTimingsRef.current;
+
+        if (vTimings && vTimings.length > 0) {
+          const vt = vTimings.find((v: any) => currentMs >= v.timestamp_from && currentMs <= v.timestamp_to);
+          if (vt) {
+            if (playingVerseKeyRef.current !== vt.verse_key) {
+              setPlayingVerseKey(vt.verse_key);
+              playingVerseKeyRef.current = vt.verse_key;
+            }
+
+            const vIdx = continuousVersesRef.current.findIndex((v: any) => v.verse_key === vt.verse_key);
+            if (vIdx !== -1 && vIdx !== continuousVerseIndexRef.current) {
+              setContinuousVerseIndex(vIdx);
+              continuousVerseIndexRef.current = vIdx;
+            }
+
+            if (vt.segments && vt.segments.length > 0) {
+              const seg = vt.segments.find((s: any) => s.length >= 3 && currentMs >= s[1] && currentMs <= s[2]);
+              if (seg) {
+                const loc = `${vt.verse_key}:${seg[0]}`;
+                if (playingWordLocationRef.current !== loc) {
+                  setPlayingWordLocation(loc);
+                  playingWordLocationRef.current = loc;
+                }
+              }
+            } else {
+              const currentVerseObj = continuousVersesRef.current.find((v: any) => v.verse_key === vt.verse_key);
+              if (currentVerseObj && currentVerseObj.words) {
+                const validWords = currentVerseObj.words.filter((w: any) => w.char_type_name !== 'end' && w.char_type_name !== 'stop');
+                if (validWords.length > 0) {
+                  const dur = (vt.timestamp_to - vt.timestamp_from) || 1;
+                  const elapsed = currentMs - vt.timestamp_from;
+                  const ratio = Math.min(Math.max(elapsed / dur, 0), 0.99);
+                  const wIdx = Math.floor(ratio * validWords.length);
+                  const activeW = validWords[wIdx];
+                  if (activeW) {
+                    const loc = `${vt.verse_key}:${activeW.position}`;
+                    if (playingWordLocationRef.current !== loc) {
+                      setPlayingWordLocation(loc);
+                      playingWordLocationRef.current = loc;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } else {
+          // Fallback per-verse calculation
+          const currentVerseObj = continuousVersesRef.current[continuousVerseIndexRef.current];
+          if (currentVerseObj && currentVerseObj.words) {
+            const validWords = currentVerseObj.words.filter((w: any) => w.char_type_name !== 'end' && w.char_type_name !== 'stop');
+            if (validWords.length > 0 && audioEl.duration) {
+              const ratio = Math.min(Math.max(audioEl.currentTime / audioEl.duration, 0), 0.99);
+              const wIdx = Math.floor(ratio * validWords.length);
+              const activeW = validWords[wIdx];
+              if (activeW) {
+                const loc = `${currentVerseObj.verse_key}:${activeW.position}`;
+                if (playingWordLocationRef.current !== loc) {
+                  setPlayingWordLocation(loc);
+                  playingWordLocationRef.current = loc;
+                }
+              }
+            }
+          }
         }
-      } else {
-        setIsContinuousAudioPlaying(false);
+      };
+    };
+
+    // OPTION A: Full Surah Continuous QDC Audio
+    if (qdcChapterAudioUrlRef.current) {
+      const qdcUrl = qdcChapterAudioUrlRef.current;
+      let audio = continuousAudioRef.current;
+
+      if (!audio || audio.src !== qdcUrl) {
+        if (audio) audio.pause();
+        audio = new Audio(qdcUrl);
+        continuousAudioRef.current = audio;
+      }
+
+      setupTimeUpdate(audio);
+
+      audio.onended = () => {
+        const currentSurah = continuousSurahObjRef.current;
+        const allSurahs = surahsRef.current;
+        if (currentSurah && currentSurah.id < 114) {
+          const nextSurah = allSurahs.find((s: any) => s.id === currentSurah.id + 1);
+          if (nextSurah) {
+            loadContinuousSurah(nextSurah, true);
+          } else {
+            setIsContinuousAudioPlaying(false);
+          }
+        } else {
+          setIsContinuousAudioPlaying(false);
+        }
+      };
+
+      if (audio.paused) {
+        audio.play().catch(e => console.warn("QDC play error:", e));
       }
       return;
     }
 
-    // Handler for seamless zero-gap verse transition when audio finishes
+    // OPTION B: Per-verse fallback if chapter audio is not available
     const handleVerseEnded = (currentIndex: number) => {
       if (!isContinuousAudioPlayingRef.current) return;
 
@@ -1798,15 +1903,16 @@ export default function App() {
         const preloaded = nextAudioPreloadRef.current;
         if (preloaded) {
           preloaded.currentTime = 0;
+          setupTimeUpdate(preloaded);
           preloaded.play().catch(e => console.warn("Preload play error:", e));
           continuousAudioRef.current = preloaded;
           playingVerseIndexRef.current = nextIndex;
         } else {
-          // Fallback if preloaded audio element was null
           const nextVerse = allVerses[nextIndex];
           const nextUrl = getResolvedUrlSync(nextVerse);
           if (nextUrl) {
             const freshAudio = new Audio(nextUrl);
+            setupTimeUpdate(freshAudio);
             freshAudio.play().catch(e => console.warn("Fresh audio play error:", e));
             continuousAudioRef.current = freshAudio;
             playingVerseIndexRef.current = nextIndex;
@@ -1814,7 +1920,6 @@ export default function App() {
         }
         setContinuousVerseIndex(nextIndex);
       } else {
-        // End of Surah
         const currentSurah = continuousSurahObjRef.current;
         const allSurahs = surahsRef.current;
         if (currentSurah && currentSurah.id < 114) {
@@ -1830,7 +1935,6 @@ export default function App() {
       }
     };
 
-    // Preload next verse audio in background
     const preloadNextVerseAudio = (currentIndex: number) => {
       const nextVerse = continuousVerses[currentIndex + 1];
       if (nextVerse) {
@@ -1848,13 +1952,13 @@ export default function App() {
       }
     };
 
-    // CASE 1: Current verse is ALREADY playing seamlessly from onended trigger
     if (
       playingVerseIndexRef.current === continuousVerseIndex &&
       continuousAudioRef.current &&
       !continuousAudioRef.current.paused
     ) {
       const currentAudio = continuousAudioRef.current;
+      setupTimeUpdate(currentAudio);
       currentAudio.onended = () => handleVerseEnded(continuousVerseIndex);
       currentAudio.onerror = () => setContinuousVerseIndex(prev => prev + 1);
 
@@ -1862,7 +1966,6 @@ export default function App() {
       return;
     }
 
-    // CASE 2: Need to start playback for continuousVerseIndex (e.g. user clicked play or skipped)
     const currentVerse = continuousVerses[continuousVerseIndex];
     if (!currentVerse) return;
 
@@ -1887,6 +1990,7 @@ export default function App() {
       audio = new Audio(currentUrl);
     }
 
+    setupTimeUpdate(audio);
     audio.onended = () => handleVerseEnded(continuousVerseIndex);
     audio.onerror = () => {
       console.warn("Audio failed to play for verse:", currentVerse.verse_key);
@@ -2046,16 +2150,67 @@ export default function App() {
     }
   };
 
+  const fetchQdcChapterAudio = async (surahId: number, reciterId: number) => {
+    try {
+      const res = await fetch(`https://api.qurancdn.com/api/qdc/audio/reciters/${reciterId}/audio_files?chapter=${surahId}&segments=true`);
+      if (res.ok) {
+        const data = await res.json();
+        const af = data.audio_files?.[0];
+        if (af && af.audio_url) {
+          qdcChapterAudioUrlRef.current = af.audio_url;
+          qdcVerseTimingsRef.current = af.verse_timings || [];
+          return af;
+        }
+      }
+    } catch (e) {
+      console.warn("QDC chapter audio fetch error:", e);
+    }
+    qdcChapterAudioUrlRef.current = null;
+    qdcVerseTimingsRef.current = [];
+    return null;
+  };
+
+  const seekAndPlayLocation = (verseKey: string, wordPosition?: number) => {
+    const vTimings = qdcVerseTimingsRef.current;
+    if (vTimings && vTimings.length > 0) {
+      const vt = vTimings.find((v: any) => v.verse_key === verseKey);
+      if (vt) {
+        let seekMs = vt.timestamp_from;
+        if (wordPosition !== undefined && vt.segments) {
+          const seg = vt.segments.find((s: any) => s[0] === wordPosition);
+          if (seg) seekMs = seg[1];
+        }
+        if (continuousAudioRef.current) {
+          continuousAudioRef.current.currentTime = seekMs / 1000;
+          continuousAudioRef.current.play().catch(e => console.warn("Seek play error:", e));
+          setIsContinuousAudioPlaying(true);
+        } else if (qdcChapterAudioUrlRef.current) {
+          const freshAudio = new Audio(qdcChapterAudioUrlRef.current);
+          freshAudio.currentTime = seekMs / 1000;
+          freshAudio.play().catch(e => console.warn("Seek fresh play error:", e));
+          continuousAudioRef.current = freshAudio;
+          setIsContinuousAudioPlaying(true);
+        }
+      }
+    }
+  };
+
   const loadContinuousSurah = async (surah: any, autoPlay: boolean = false) => {
     setContinuousSurahObj(surah);
     setIsLoadingContinuous(true);
     setContinuousVerseIndex(0);
     setIsContinuousAudioPlaying(false);
+    setPlayingWordLocation(null);
+    setPlayingVerseKey(null);
     if (continuousAudioRef.current) {
       continuousAudioRef.current.pause();
+      continuousAudioRef.current = null;
     }
     const apiReciter = getApiReciterId(selectedReciter);
     
+    // Fetch QDC full surah continuous audio & word segment timings
+    fetchQdcChapterAudio(surah.id, selectedReciter);
+
     // Check IndexedDB cache first
     const cached = await getSurahFromDB(surah.id + 1000, apiReciter);
     if (cached && cached.length > 0) {
@@ -2903,6 +3058,7 @@ export default function App() {
             playAudio={playAudio}
             playingWordId={playingWordId}
             playingVerseKey={playingVerseKey}
+            playingWordLocation={playingWordLocation}
             tafsirData={tafsirData}
             isLoadingTafsir={isLoadingTafsir}
             generatedImages={generatedImages}
@@ -3266,14 +3422,19 @@ export default function App() {
                                            word.text_uthmani !== 'ۘ' && 
                                            word.text_uthmani !== 'ۙ' && 
                                            word.text_uthmani !== 'ۚ';
-                          const isPlaying = playingWordId === word.id;
+                          const isPlaying = playingWordId === word.id || (!!playingWordLocation && playingWordLocation === `${verse.verse_key}:${word.position}`);
                           return (
                             <span 
                               key={word.id}
-                              onClick={() => {
+                              onClick={(e) => {
+                                if (e) e.stopPropagation();
                                 if (hasAudio) {
-                                  const correctUrl = getCorrectWordAudioUrl(word, verse.words, verse.verse_key);
-                                  playAudio(correctUrl, 'word', word.id);
+                                  if (qdcVerseTimingsRef.current.length > 0) {
+                                    seekAndPlayLocation(verse.verse_key, word.position);
+                                  } else {
+                                    const correctUrl = getCorrectWordAudioUrl(word, verse.words, verse.verse_key);
+                                    playAudio(correctUrl, 'word', word.id);
+                                  }
                                 }
                               }}
                               className={`inline quran-text select-none transition-all duration-200 ${
@@ -3286,7 +3447,7 @@ export default function App() {
                                   : ''
                               } ${
                                 isPlaying 
-                                  ? (isDarkMode ? 'bg-emerald-950 text-emerald-400 font-bold border-b-2 border-emerald-500' : 'bg-emerald-50 text-emerald-700 font-bold border-b-2 border-emerald-500') 
+                                  ? (isDarkMode ? 'bg-cyan-500/35 text-cyan-200 font-extrabold ring-2 ring-cyan-400/80 rounded px-1.5 py-0.5 shadow-sm scale-105' : 'bg-cyan-500/25 text-cyan-900 font-extrabold ring-2 ring-cyan-500/80 rounded px-1.5 py-0.5 shadow-sm scale-105') 
                                   : ''
                               }`} 
                               style={{ fontFamily: selectedFont, fontSize: `${fontSize}px` }}
@@ -3497,14 +3658,19 @@ export default function App() {
                                              word.text_uthmani !== 'ۘ' && 
                                              word.text_uthmani !== 'ۙ' && 
                                              word.text_uthmani !== 'ۚ';
-                            const isPlaying = playingWordId === word.id;
+                            const isPlaying = playingWordId === word.id || (!!playingWordLocation && playingWordLocation === `${verse.verse_key}:${word.position}`);
                             return (
                               <span 
                                 key={word.id}
-                                onClick={() => {
+                                onClick={(e) => {
+                                  if (e) e.stopPropagation();
                                   if (hasAudio) {
-                                    const correctUrl = getCorrectWordAudioUrl(word, verse.words, verse.verse_key);
-                                    playAudio(correctUrl, 'word', word.id);
+                                    if (qdcVerseTimingsRef.current.length > 0) {
+                                      seekAndPlayLocation(verse.verse_key, word.position);
+                                    } else {
+                                      const correctUrl = getCorrectWordAudioUrl(word, verse.words, verse.verse_key);
+                                      playAudio(correctUrl, 'word', word.id);
+                                    }
                                   }
                                 }}
                                 className={`inline quran-text select-none transition-all duration-200 ${
@@ -3517,7 +3683,7 @@ export default function App() {
                                     : ''
                                 } ${
                                   isPlaying 
-                                    ? (isDarkMode ? 'bg-emerald-950 text-emerald-400 font-bold border-b-2 border-emerald-500' : 'bg-emerald-50 text-emerald-700 font-bold border-b-2 border-emerald-500') 
+                                    ? (isDarkMode ? 'bg-cyan-500/35 text-cyan-200 font-extrabold ring-2 ring-cyan-400/80 rounded px-1.5 py-0.5 shadow-sm scale-105' : 'bg-cyan-500/25 text-cyan-900 font-extrabold ring-2 ring-cyan-500/80 rounded px-1.5 py-0.5 shadow-sm scale-105') 
                                     : ''
                                 }`} 
                                 style={{ fontFamily: selectedFont, fontSize: `${fontSize}px` }}
@@ -3774,15 +3940,19 @@ export default function App() {
                                                word.text_uthmani !== 'ۘ' && 
                                                word.text_uthmani !== 'ۙ' && 
                                                word.text_uthmani !== 'ۚ';
-                              const isPlaying = playingWordId === word.id;
+                              const isPlaying = playingWordId === word.id || (!!playingWordLocation && playingWordLocation === `${verse.verse_key}:${word.position}`);
                               return (
                                 <span 
                                   key={word.id}
                                   onClick={(e) => {
+                                    if (e) e.stopPropagation();
                                     if (hasAudio) {
-                                      e.stopPropagation();
-                                      const correctUrl = getCorrectWordAudioUrl(word, verse.words, verse.verse_key);
-                                      playAudio(correctUrl, 'word', word.id);
+                                      if (qdcVerseTimingsRef.current.length > 0) {
+                                        seekAndPlayLocation(verse.verse_key, word.position);
+                                      } else {
+                                        const correctUrl = getCorrectWordAudioUrl(word, verse.words, verse.verse_key);
+                                        playAudio(correctUrl, 'word', word.id);
+                                      }
                                     }
                                   }}
                                   className={`inline quran-text select-none transition-all duration-200 ${
@@ -3795,7 +3965,7 @@ export default function App() {
                                       : ''
                                   } ${
                                     isPlaying 
-                                      ? (isDarkMode ? 'bg-emerald-950 text-emerald-400 font-bold border-b-2 border-emerald-500' : 'bg-emerald-50 text-emerald-700 font-bold border-b-2 border-emerald-500') 
+                                      ? (isDarkMode ? 'bg-cyan-500/35 text-cyan-200 font-extrabold ring-2 ring-cyan-400/80 rounded px-1.5 py-0.5 shadow-sm scale-105' : 'bg-cyan-500/25 text-cyan-900 font-extrabold ring-2 ring-cyan-500/80 rounded px-1.5 py-0.5 shadow-sm scale-105') 
                                       : ''
                                   }`} 
                                   style={{ fontFamily: selectedFont, fontSize: `${fontSize}px` }}
