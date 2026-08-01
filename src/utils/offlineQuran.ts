@@ -84,12 +84,15 @@ export async function saveSurahToDB(surahId: number, reciterId: number, verses: 
 
 // Retrieve surah text from IndexedDB
 export async function getSurahFromDB(surahId: number, reciterId: number): Promise<any[] | null> {
+  const normalizedId = surahId > 1000 ? surahId - 1000 : surahId;
   const key = `${surahId}_reciter_${reciterId}`;
+  
+  // 1. Check direct key or default reciter key in STORE_SURAHS
   try {
     const db = await openQuranDB();
     const tx = db.transaction(STORE_SURAHS, 'readonly');
     const store = tx.objectStore(STORE_SURAHS);
-    return new Promise((resolve) => {
+    const resultVerses: any[] = await new Promise((resolve) => {
       const req = store.get(key);
       req.onsuccess = () => {
         if (req.result && req.result.verses) resolve(req.result.verses);
@@ -97,13 +100,70 @@ export async function getSurahFromDB(surahId: number, reciterId: number): Promis
       };
       req.onerror = () => resolve(null);
     });
+    if (resultVerses && resultVerses.length > 0) {
+      return resultVerses;
+    }
+
+    const defaultKey = `${normalizedId}_reciter_7`;
+    const defaultVerses: any[] = await new Promise((resolve) => {
+      const req = store.get(defaultKey);
+      req.onsuccess = () => {
+        if (req.result && req.result.verses) resolve(req.result.verses);
+        else resolve(null);
+      };
+      req.onerror = () => resolve(null);
+    });
+    if (defaultVerses && defaultVerses.length > 0) {
+      return defaultVerses;
+    }
+  } catch (err) {}
+
+  // 2. FALLBACK: Gather verses for this surah from all stored pages in STORE_PAGES
+  try {
+    const db = await openQuranDB();
+    const tx = db.transaction(STORE_PAGES, 'readonly');
+    const store = tx.objectStore(STORE_PAGES);
+    const allPages: any[] = await new Promise((resolve) => {
+      const req = store.getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => resolve([]);
+    });
+
+    if (allPages && allPages.length > 0) {
+      const collectedVerses: any[] = [];
+      const seenVerseKeys = new Set<string>();
+
+      allPages.sort((a, b) => a.page - b.page);
+
+      for (const p of allPages) {
+        if (p.verses && Array.isArray(p.verses)) {
+          for (const v of p.verses) {
+            if (v.verse_key) {
+              const [sIdStr] = v.verse_key.split(':');
+              if (parseInt(sIdStr) === normalizedId && !seenVerseKeys.has(v.verse_key)) {
+                seenVerseKeys.add(v.verse_key);
+                collectedVerses.push(v);
+              }
+            }
+          }
+        }
+      }
+
+      if (collectedVerses.length > 0) {
+        saveSurahToDB(surahId, reciterId, collectedVerses);
+        return collectedVerses;
+      }
+    }
   } catch (err) {
-    try {
-      const cached = localStorage.getItem(`quran_offline_surah_${key}`);
-      if (cached) return JSON.parse(cached);
-    } catch (e) {}
-    return null;
+    console.warn("Error getting surah from pages DB:", err);
   }
+
+  try {
+    const cached = localStorage.getItem(`quran_offline_surah_${key}`);
+    if (cached) return JSON.parse(cached);
+  } catch (e) {}
+
+  return null;
 }
 
 // Get CacheStorage instance

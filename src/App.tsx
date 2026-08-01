@@ -1855,13 +1855,40 @@ export default function App() {
     try {
       setIsLoadingQuran(true);
       const res = await fetch('https://api.quran.com/api/v4/chapters?language=ar');
-      const data = await res.json();
-      setSurahs(data.chapters);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.chapters && data.chapters.length > 0) {
+          setSurahs(data.chapters);
+          try {
+            localStorage.setItem('cached_surahs_list', JSON.stringify(data.chapters));
+          } catch (e) {}
+          return;
+        }
+      }
     } catch (err) {
-      console.error("Failed to fetch surahs", err);
+      console.warn("Offline or network issue fetching surahs list:", err);
     } finally {
       setIsLoadingQuran(false);
     }
+
+    try {
+      const cached = localStorage.getItem('cached_surahs_list');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && parsed.length > 0) {
+          setSurahs(parsed);
+          return;
+        }
+      }
+    } catch (e) {}
+
+    const fallbackChapters = surahList.map(s => ({
+      id: s.id,
+      name_arabic: s.name,
+      name_simple: s.englishName,
+      verses_count: 0
+    }));
+    setSurahs(fallbackChapters);
   };
 
   const loadSurah = async (surah: any, page: number = 1, append: boolean = false) => {
@@ -1873,6 +1900,7 @@ export default function App() {
     const cached = await getSurahFromDB(surah.id, apiReciter);
     if (cached && cached.length > 0 && !append) {
       setVerses(cached);
+      setQuranTotalPages(1);
       setIsLoadingQuran(false);
     }
 
@@ -2468,6 +2496,28 @@ export default function App() {
                   <Plus className="w-4 h-4" />
                 </button>
               </div>
+
+              {/* Offline Download Manager Button */}
+              <button 
+                onClick={() => setShowWbwOfflineModal(true)}
+                className={`p-2.5 rounded-xl transition-all flex items-center gap-1.5 text-xs font-bold ${
+                  (textDownloadStatus.isComplete && wbwDownloadStatus.isComplete)
+                    ? 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/30'
+                    : (textDownloadStatus.isDownloading || wbwDownloadStatus.isDownloading)
+                    ? 'bg-amber-500 text-white animate-pulse shadow-md'
+                    : 'bg-white/10 hover:bg-white/20 text-white'
+                }`}
+                title="داونلۆدکرنا فایلا قورئانێ بۆ ئۆفلاین (Offline Manager)"
+              >
+                <DownloadCloud className="w-5 h-5 text-emerald-300" />
+                <span className="hidden sm:inline">
+                  {(textDownloadStatus.isDownloading || wbwDownloadStatus.isDownloading)
+                    ? `%${Math.max(textDownloadStatus.percent, wbwDownloadStatus.percent)} داونلۆد...`
+                    : (textDownloadStatus.isComplete && wbwDownloadStatus.isComplete)
+                    ? 'ئۆفلاین ✓'
+                    : 'داونلۆد ئۆفلاین'}
+                </span>
+              </button>
 
               {/* Dark Mode Toggle */}
               <button 
