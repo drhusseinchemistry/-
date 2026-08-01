@@ -1450,6 +1450,19 @@ export default function App() {
   const [autoScrollSpeed, setAutoScrollSpeed] = useState(5);
   const continuousAudioRef = React.useRef<HTMLAudioElement | null>(null);
   const nextAudioPreloadRef = React.useRef<HTMLAudioElement | null>(null);
+  const playingVerseIndexRef = React.useRef<number | null>(null);
+
+  const continuousVersesRef = React.useRef<any[]>([]);
+  continuousVersesRef.current = continuousVerses;
+
+  const isContinuousAudioPlayingRef = React.useRef<boolean>(isContinuousAudioPlaying);
+  isContinuousAudioPlayingRef.current = isContinuousAudioPlaying;
+
+  const continuousSurahObjRef = React.useRef<any>(continuousSurahObj);
+  continuousSurahObjRef.current = continuousSurahObj;
+
+  const surahsRef = React.useRef<any[]>(surahs);
+  surahsRef.current = surahs;
 
   const toggleAdhkarExpansion = (id: string) => {
     const newExpanded = new Set(expandedAdhkarIds);
@@ -1705,82 +1718,215 @@ export default function App() {
 
   useEffect(() => {
     if (activeTab !== 'continuous') {
-      if (continuousAudioRef.current) continuousAudioRef.current.pause();
+      if (continuousAudioRef.current) {
+        continuousAudioRef.current.pause();
+        continuousAudioRef.current = null;
+      }
       if (nextAudioPreloadRef.current) {
         nextAudioPreloadRef.current.pause();
         nextAudioPreloadRef.current = null;
       }
+      playingVerseIndexRef.current = null;
       setIsContinuousAudioPlaying(false);
       setIsAutoScrolling(false);
       return;
     }
 
-    if (isContinuousAudioPlaying && continuousVerses.length > 0) {
-      const verse = continuousVerses[continuousVerseIndex];
-      if (!verse) {
-        // End of Surah, load next Surah
-        if (continuousSurahObj && continuousSurahObj.id < 114) {
-          const nextSurah = surahs.find(s => s.id === continuousSurahObj.id + 1);
-          if (nextSurah) {
-            loadContinuousSurah(nextSurah, true);
-          }
-        } else {
-          setIsContinuousAudioPlaying(false); // End of Quran
+    if (!isContinuousAudioPlaying) {
+      if (continuousAudioRef.current) {
+        continuousAudioRef.current.pause();
+      }
+      playingVerseIndexRef.current = null;
+      return;
+    }
+
+    if (continuousVerses.length === 0) return;
+
+    // Helper to resolve full URL or offline IndexedDB blob URL
+    const resolveAudioUrl = async (rawUrl: string): Promise<string> => {
+      if (!rawUrl) return '';
+      const fullUrl = rawUrl.startsWith('http') ? rawUrl : `https://verses.quran.com/${rawUrl}`;
+      try {
+        const cachedBlobUrl = await getCachedAudioBlobUrl(fullUrl, false);
+        if (cachedBlobUrl) return cachedBlobUrl;
+      } catch (e) {}
+      return fullUrl;
+    };
+
+    // Check if end of Surah
+    if (continuousVerseIndex >= continuousVerses.length) {
+      if (continuousSurahObj && continuousSurahObj.id < 114) {
+        const nextSurah = surahs.find(s => s.id === continuousSurahObj.id + 1);
+        if (nextSurah) {
+          loadContinuousSurah(nextSurah, true);
         }
+      } else {
+        setIsContinuousAudioPlaying(false);
+      }
+      return;
+    }
+
+    // Check if current verse audio is ALREADY playing seamlessly via onended transition
+    if (
+      playingVerseIndexRef.current === continuousVerseIndex &&
+      continuousAudioRef.current &&
+      !continuousAudioRef.current.paused
+    ) {
+      const currentAudio = continuousAudioRef.current;
+      currentAudio.onended = () => {
+        if (!isContinuousAudioPlayingRef.current) return;
+
+        const nextIndex = continuousVerseIndex + 1;
+        const allVerses = continuousVersesRef.current;
+
+        if (nextIndex < allVerses.length) {
+          const preloaded = nextAudioPreloadRef.current;
+          if (preloaded) {
+            preloaded.currentTime = 0;
+            preloaded.play().catch(e => console.warn("Preload play error:", e));
+            continuousAudioRef.current = preloaded;
+            playingVerseIndexRef.current = nextIndex;
+          }
+          setContinuousVerseIndex(nextIndex);
+        } else {
+          // End of Surah
+          const currentSurah = continuousSurahObjRef.current;
+          const allSurahs = surahsRef.current;
+          if (currentSurah && currentSurah.id < 114) {
+            const nextSurah = allSurahs.find((s: any) => s.id === currentSurah.id + 1);
+            if (nextSurah) {
+              loadContinuousSurah(nextSurah, true);
+            } else {
+              setIsContinuousAudioPlaying(false);
+            }
+          } else {
+            setIsContinuousAudioPlaying(false);
+          }
+        }
+      };
+
+      currentAudio.onerror = () => {
+        setContinuousVerseIndex(prev => prev + 1);
+      };
+
+      // Preload NEXT verse (continuousVerseIndex + 1)
+      const nextVerse = continuousVerses[continuousVerseIndex + 1];
+      if (nextVerse) {
+        const nextCustomUrl = getVerseAudioUrl(nextVerse.verse_key, selectedReciter, nextVerse.audio?.url);
+        if (nextCustomUrl) {
+          resolveAudioUrl(nextCustomUrl).then(nextResolvedUrl => {
+            if (isContinuousAudioPlayingRef.current && playingVerseIndexRef.current === continuousVerseIndex) {
+              const preloadAudio = new Audio(nextResolvedUrl);
+              preloadAudio.preload = "auto";
+              preloadAudio.load();
+              nextAudioPreloadRef.current = preloadAudio;
+            }
+          });
+        }
+      } else {
+        nextAudioPreloadRef.current = null;
+      }
+      return;
+    }
+
+    // Otherwise, start or restart playback for continuousVerseIndex
+    let cancelled = false;
+    const playCurrentAndPreloadNext = async () => {
+      const verse = continuousVerses[continuousVerseIndex];
+      if (!verse) return;
+
+      const customUrl = getVerseAudioUrl(verse.verse_key, selectedReciter, verse.audio?.url);
+      if (!customUrl) {
+        setContinuousVerseIndex(prev => prev + 1);
         return;
       }
 
-      const customUrl = getVerseAudioUrl(verse.verse_key, selectedReciter, verse.audio?.url);
-      if (customUrl) {
-        const fullUrl = customUrl.startsWith('http') ? customUrl : `https://verses.quran.com/${customUrl}`;
-        if (continuousAudioRef.current) {
-          continuousAudioRef.current.pause();
-        }
+      const currentResolvedUrl = await resolveAudioUrl(customUrl);
+      if (cancelled) return;
 
-        let audio: HTMLAudioElement;
-        
-        // If we already preloaded this audio element, use it directly!
-        if (nextAudioPreloadRef.current && (nextAudioPreloadRef.current.src === fullUrl || decodeURIComponent(nextAudioPreloadRef.current.src) === decodeURIComponent(fullUrl))) {
-          audio = nextAudioPreloadRef.current;
-        } else {
-          audio = new Audio(fullUrl);
-        }
+      if (continuousAudioRef.current) {
+        continuousAudioRef.current.pause();
+      }
 
-        audio.onended = () => {
-          setContinuousVerseIndex(prev => prev + 1);
-        };
-        audio.onerror = () => {
-          console.error("Continuous audio failed to load:", fullUrl);
-          setContinuousVerseIndex(prev => prev + 1);
-        };
-        audio.play().catch(e => console.error("Play error:", e));
-        continuousAudioRef.current = audio;
-
-        // Immediately start preloading the NEXT verse to guarantee gapless instant playback
-        const nextVerse = continuousVerses[continuousVerseIndex + 1];
-        if (nextVerse) {
-          const nextCustomUrl = getVerseAudioUrl(nextVerse.verse_key, selectedReciter, nextVerse.audio?.url);
-          if (nextCustomUrl) {
-            const nextFullUrl = nextCustomUrl.startsWith('http') ? nextCustomUrl : `https://verses.quran.com/${nextCustomUrl}`;
-            const preloadAudio = new Audio(nextFullUrl);
-            preloadAudio.preload = "auto";
-            preloadAudio.load(); // explicitly buffer the file in the background
-            nextAudioPreloadRef.current = preloadAudio;
-          } else {
-            nextAudioPreloadRef.current = null;
-          }
-        } else {
-          nextAudioPreloadRef.current = null;
-        }
+      let audio: HTMLAudioElement;
+      if (
+        nextAudioPreloadRef.current &&
+        (nextAudioPreloadRef.current.src === currentResolvedUrl ||
+          decodeURIComponent(nextAudioPreloadRef.current.src) === decodeURIComponent(currentResolvedUrl))
+      ) {
+        audio = nextAudioPreloadRef.current;
       } else {
+        audio = new Audio(currentResolvedUrl);
+      }
+
+      // Preload next verse immediately in parallel
+      const nextVerse = continuousVerses[continuousVerseIndex + 1];
+      let preloadingNextPromise: Promise<HTMLAudioElement | null> = Promise.resolve(null);
+      if (nextVerse) {
+        const nextCustomUrl = getVerseAudioUrl(nextVerse.verse_key, selectedReciter, nextVerse.audio?.url);
+        if (nextCustomUrl) {
+          preloadingNextPromise = resolveAudioUrl(nextCustomUrl).then(nextResolvedUrl => {
+            if (cancelled) return null;
+            const pAudio = new Audio(nextResolvedUrl);
+            pAudio.preload = "auto";
+            pAudio.load();
+            return pAudio;
+          });
+        }
+      }
+
+      const preloadedNextAudio = await preloadingNextPromise;
+      if (cancelled) return;
+      nextAudioPreloadRef.current = preloadedNextAudio;
+
+      // Attach zero-gap onended handler
+      audio.onended = () => {
+        if (!isContinuousAudioPlayingRef.current) return;
+
+        const nextIndex = continuousVerseIndex + 1;
+        const allVerses = continuousVersesRef.current;
+
+        if (nextIndex < allVerses.length) {
+          const preloaded = nextAudioPreloadRef.current;
+          if (preloaded) {
+            preloaded.currentTime = 0;
+            preloaded.play().catch(e => console.warn("Preload play error:", e));
+            continuousAudioRef.current = preloaded;
+            playingVerseIndexRef.current = nextIndex;
+          }
+          setContinuousVerseIndex(nextIndex);
+        } else {
+          // End of Surah
+          const currentSurah = continuousSurahObjRef.current;
+          const allSurahs = surahsRef.current;
+          if (currentSurah && currentSurah.id < 114) {
+            const nextSurah = allSurahs.find((s: any) => s.id === currentSurah.id + 1);
+            if (nextSurah) {
+              loadContinuousSurah(nextSurah, true);
+            } else {
+              setIsContinuousAudioPlaying(false);
+            }
+          } else {
+            setIsContinuousAudioPlaying(false);
+          }
+        }
+      };
+
+      audio.onerror = () => {
+        console.warn("Audio failed to play for verse:", verse.verse_key);
         setContinuousVerseIndex(prev => prev + 1);
-      }
-    } else if (!isContinuousAudioPlaying && continuousAudioRef.current) {
-      continuousAudioRef.current.pause();
-      if (nextAudioPreloadRef.current) {
-        nextAudioPreloadRef.current.pause();
-      }
-    }
+      };
+
+      audio.play().catch(e => console.warn("Continuous play error:", e));
+      continuousAudioRef.current = audio;
+      playingVerseIndexRef.current = continuousVerseIndex;
+    };
+
+    playCurrentAndPreloadNext();
+
+    return () => {
+      cancelled = true;
+    };
   }, [isContinuousAudioPlaying, continuousVerseIndex, continuousVerses, activeTab, selectedReciter]);
 
   useEffect(() => {
