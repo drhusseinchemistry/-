@@ -1,7 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Book, List as ListIcon, Loader2, BookOpen, ChevronRight, Key, Save, Check, Play, Volume2, MessageCircle, BookHeart, Pause, Image as ImageIcon, Download, Sun, Moon, Type as TypeIcon, Plus, Minus, Minimize2 } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Search, Book, List as ListIcon, Loader2, BookOpen, ChevronRight, Key, Save, Check, Play, Volume2, MessageCircle, BookHeart, Pause, Image as ImageIcon, Download, Sun, Moon, Type as TypeIcon, Plus, Minus, Minimize2, DownloadCloud, CheckCircle2, X } from 'lucide-react';
 import { GoogleGenAI, Type } from '@google/genai';
 import { motion, AnimatePresence } from 'motion/react';
+import { getPageFromDB, savePageToDB, getSurahFromDB, saveSurahToDB, getCachedAudioBlobUrl, cacheAudioFile } from './utils/offlineQuran';
 
 const commonWords = [
   { word: 'ٱللَّهُ', meaning: 'خودێ' },
@@ -177,6 +178,173 @@ const VerseEndMarker = ({ num, isPlaying, onClick }: { num: string; isPlaying: b
   );
 };
 
+function WbwOfflineModal({
+  isOpen,
+  onClose,
+  status,
+  onStart,
+  onPause,
+  onResume,
+  isDarkMode
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  status: {
+    isDownloading: boolean;
+    isPaused: boolean;
+    currentPage: number;
+    totalPages: number;
+    percent: number;
+    isComplete: boolean;
+  };
+  onStart: () => void;
+  onPause: () => void;
+  onResume: () => void;
+  isDarkMode: boolean;
+}) {
+  if (!isOpen) return null;
+
+  return (
+    <AnimatePresence>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" dir="rtl">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.9, y: 20 }}
+          className={`relative w-full max-w-lg p-6 rounded-3xl shadow-2xl border ${
+            isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-zinc-200 text-zinc-900'
+          }`}
+        >
+          {/* Close button */}
+          <button 
+            onClick={onClose}
+            className={`absolute top-4 left-4 p-2 rounded-full transition-colors ${
+              isDarkMode ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
+            }`}
+          >
+            <X className="w-5 h-5" />
+          </button>
+
+          <div className="flex flex-col items-center text-center space-y-4">
+            <div className={`p-4 rounded-2xl ${
+              status.isComplete 
+                ? 'bg-emerald-500/10 text-emerald-500' 
+                : 'bg-amber-500/10 text-amber-500'
+            }`}>
+              {status.isComplete ? (
+                <CheckCircle2 className="w-10 h-10" />
+              ) : (
+                <DownloadCloud className="w-10 h-10 animate-bounce" />
+              )}
+            </div>
+
+            <h3 className="text-xl font-bold">
+              {status.isComplete 
+                ? 'فایلا دەنگێ پەیڤ ب پەیڤ یا ئامادەیە'
+                : 'داونلۆدکرنا فایلا دەنگێ پەیڤ ب پەیڤ (ئۆفلاین)'}
+            </h3>
+
+            <p className={`text-sm leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+              {status.isComplete 
+                ? 'هەمی دەنگێن پەیڤ ب پەیڤ یێن قورئانا پیرۆز ب سەرکەوتوویی بۆ بکارئینانا ئۆفلاین هاتنە داونلۆدکرن. نوکە تە دشێی بێ ئینتەرنێت ژی گوێ ل دەنگێ پەیڤان بگری.'
+                : 'ئەرێ تە دڤێت هەمی دەنگ و نڤیسینا پەیڤ ب پەیڤ یا قورئانا پیرۆز بۆ بکارئینانا ئۆفلاین داونلۆد بکەی؟'}
+            </p>
+
+            {/* Progress Display */}
+            {(status.isDownloading || status.isPaused || (status.currentPage > 0 && !status.isComplete)) && (
+              <div className="w-full space-y-2 pt-2">
+                <div className="flex justify-between items-center text-xs font-bold">
+                  <span className={isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}>
+                    رێژە: %{status.percent}
+                  </span>
+                  <span className={isDarkMode ? 'text-slate-400' : 'text-slate-500'}>
+                    پەڕە {status.currentPage} ژ ٦٠٤
+                  </span>
+                </div>
+                {/* Progress bar */}
+                <div className={`w-full h-3 rounded-full overflow-hidden ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                  <div 
+                    className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-300 rounded-full"
+                    style={{ width: `${status.percent}%` }}
+                  />
+                </div>
+                {status.isPaused && (
+                  <p className="text-xs text-amber-500 font-medium">داونلۆدکرن یا ڕاوەستیا کەتی (Pause)</p>
+                )}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex items-center gap-3 w-full pt-4">
+              {status.isComplete ? (
+                <button
+                  onClick={onClose}
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all shadow-md"
+                >
+                  تەمام / داخستن
+                </button>
+              ) : status.isDownloading ? (
+                <>
+                  <button
+                    onClick={onPause}
+                    className={`flex-1 py-2.5 rounded-xl font-bold text-sm border transition-all ${
+                      isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    وەستاندن (Pause)
+                  </button>
+                  <button
+                    onClick={onClose}
+                    className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-all shadow-md"
+                  >
+                    بەردەوامبە د پاشخانێ دا
+                  </button>
+                </>
+              ) : status.isPaused ? (
+                <>
+                  <button
+                    onClick={onResume}
+                    className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-all shadow-md flex items-center justify-center gap-2"
+                  >
+                    <DownloadCloud className="w-4 h-4" />
+                    دەستپێکرنەڤە
+                  </button>
+                  <button
+                    onClick={onClose}
+                    className={`flex-1 py-3 rounded-xl font-bold text-sm border transition-all ${
+                      isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700'
+                    }`}
+                  >
+                    پاشتر
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={onStart}
+                    className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-all shadow-md flex items-center justify-center gap-2"
+                  >
+                    <DownloadCloud className="w-5 h-5" />
+                    بێگومان، داونلۆد بکە
+                  </button>
+                  <button
+                    onClick={onClose}
+                    className={`flex-1 py-3 rounded-xl font-bold text-sm border transition-all ${
+                      isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    نەخێر / پاشتر
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    </AnimatePresence>
+  );
+}
+
 function MushafView({ 
   page, 
   setPage, 
@@ -197,7 +365,9 @@ function MushafView({
   handleGenerateImage,
   downloadIllustratedImage,
   getCorrectWordAudioUrl,
-  cleanTajweed
+  cleanTajweed,
+  openWbwOfflineModal,
+  wbwDownloadStatus
 }: { 
   page: number;
   setPage: (p: number) => void;
@@ -219,6 +389,15 @@ function MushafView({
   downloadIllustratedImage: (verseKey: string) => void;
   getCorrectWordAudioUrl: (word: any, wordsList: any[], verseKey: string) => string;
   cleanTajweed: (text: string) => string;
+  openWbwOfflineModal?: () => void;
+  wbwDownloadStatus?: {
+    isDownloading: boolean;
+    isPaused: boolean;
+    currentPage: number;
+    totalPages: number;
+    percent: number;
+    isComplete: boolean;
+  };
 }) {
   const [showSurahList, setShowSurahList] = useState(false);
   const [jumpPage, setJumpPage] = useState(page.toString());
@@ -687,19 +866,34 @@ function MushafView({
   };
 
   useEffect(() => {
+    let isMounted = true;
     const fetchPageVerses = async () => {
       setIsLoading(true);
+      // 1. Try offline cache (IndexedDB) first for instant display
+      const cached = await getPageFromDB(page);
+      if (cached && cached.length > 0 && isMounted) {
+        setVerses(cached);
+        setIsLoading(false);
+      }
+      
+      // 2. Refresh/Fetch from API if connected
       try {
         const res = await fetch(`https://api.quran.com/api/v4/verses/by_page/${page}?language=ar&words=true&word_fields=text_uthmani,text_uthmani_tajweed,audio_url&per_page=50`);
-        const data = await res.json();
-        setVerses(data.verses);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.verses && isMounted) {
+            setVerses(data.verses);
+            savePageToDB(page, data.verses);
+          }
+        }
       } catch (err) {
-        console.error("Failed to fetch page verses", err);
+        console.warn("Offline or network issue, using cached page verses", err);
       } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     };
     fetchPageVerses();
+    return () => { isMounted = false; };
   }, [page]);
 
   const nextPage = () => { if (page < 604) { setPage(page + 1); setJumpPage((page + 1).toString()); setSelectedVerse(null); } };
@@ -749,6 +943,32 @@ function MushafView({
         </div>
 
         <div className="flex items-center gap-2">
+          {openWbwOfflineModal && wbwDownloadStatus && (
+            <button 
+              onClick={openWbwOfflineModal}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                wbwDownloadStatus.isComplete
+                  ? (isDarkMode ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800' : 'bg-emerald-50 text-emerald-700 border border-emerald-200')
+                  : wbwDownloadStatus.isDownloading
+                  ? 'bg-amber-500 text-white animate-pulse shadow-sm'
+                  : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200')
+              }`}
+              title="داونلۆدکرنا فایلا دەنگێ پەیڤ ب پەیڤ بۆ ئۆفلاین"
+            >
+              <DownloadCloud className="w-4 h-4" />
+              <span className="hidden sm:inline">
+                {wbwDownloadStatus.isComplete 
+                  ? 'ئۆفلاین ئامادەیە' 
+                  : wbwDownloadStatus.isDownloading 
+                  ? `%${wbwDownloadStatus.percent} داونلۆد` 
+                  : 'پەیڤ ب پەیڤ (ئۆفلاین)'}
+              </span>
+              {wbwDownloadStatus.isDownloading && (
+                <span className="sm:hidden text-[10px] font-bold">%{wbwDownloadStatus.percent}</span>
+              )}
+            </button>
+          )}
+
           <form onSubmit={handleJump} className="flex items-center gap-1.5 sm:gap-2">
             <input 
               type="number"
@@ -923,6 +1143,116 @@ export default function App() {
   // Dark Mode & Font Size State
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('dark_mode') === 'true');
   const [fontSize, setFontSize] = useState(() => Number(localStorage.getItem('font_size')) || 24);
+
+  // Word-by-Word offline download state
+  const [showWbwOfflineModal, setShowWbwOfflineModal] = useState<boolean>(false);
+  const wbwCancelRef = useRef<boolean>(false);
+  const [wbwDownloadStatus, setWbwDownloadStatus] = useState<{
+    isDownloading: boolean;
+    isPaused: boolean;
+    currentPage: number;
+    totalPages: number;
+    percent: number;
+    isComplete: boolean;
+  }>(() => {
+    const isComp = localStorage.getItem('wbw_offline_completed') === 'true';
+    const lastPage = Number(localStorage.getItem('wbw_offline_last_page')) || 0;
+    const percent = isComp ? 100 : Math.min(99, Math.round((lastPage / 604) * 100));
+    return {
+      isDownloading: false,
+      isPaused: false,
+      currentPage: lastPage,
+      totalPages: 604,
+      percent,
+      isComplete: isComp,
+    };
+  });
+
+  // Prompt on first app load for word-by-word offline download
+  useEffect(() => {
+    const hasPrompted = localStorage.getItem('wbw_offline_prompt_shown');
+    const isCompleted = localStorage.getItem('wbw_offline_completed') === 'true';
+    if (!hasPrompted && !isCompleted) {
+      setShowWbwOfflineModal(true);
+      localStorage.setItem('wbw_offline_prompt_shown', 'true');
+    }
+  }, []);
+
+  // Worker for downloading all word-by-word audio and pages for offline
+  const startWbwDownload = async () => {
+    setWbwDownloadStatus(prev => ({ ...prev, isDownloading: true, isPaused: false }));
+    wbwCancelRef.current = false;
+
+    let startP = wbwDownloadStatus.currentPage > 0 && wbwDownloadStatus.currentPage < 604
+      ? wbwDownloadStatus.currentPage
+      : 1;
+
+    for (let p = startP; p <= 604; p++) {
+      if (wbwCancelRef.current) {
+        setWbwDownloadStatus(prev => ({ ...prev, isDownloading: false, isPaused: true }));
+        return;
+      }
+
+      const percent = Math.round((p / 604) * 100);
+      setWbwDownloadStatus(prev => ({
+        ...prev,
+        currentPage: p,
+        percent,
+        isDownloading: true,
+        isPaused: false
+      }));
+
+      try {
+        let pageVerses = await getPageFromDB(p);
+        if (!pageVerses || pageVerses.length === 0) {
+          const res = await fetch(`https://api.quran.com/api/v4/verses/by_page/${p}?language=ar&words=true&word_fields=text_uthmani,text_uthmani_tajweed,audio_url&per_page=50`);
+          if (res.ok) {
+            const data = await res.json();
+            pageVerses = data.verses;
+            if (pageVerses) {
+              await savePageToDB(p, pageVerses);
+            }
+          }
+        }
+
+        if (pageVerses && Array.isArray(pageVerses)) {
+          for (const verse of pageVerses) {
+            if (verse.words && Array.isArray(verse.words)) {
+              for (const word of verse.words) {
+                if (word.char_type_name === 'word') {
+                  const audioPath = getCorrectWordAudioUrl(word, verse.words, verse.verse_key);
+                  if (audioPath) {
+                    const fullUrl = audioPath.startsWith('http') ? audioPath : `https://audio.qurancdn.com/${audioPath}`;
+                    await cacheAudioFile(fullUrl, true);
+                  }
+                }
+              }
+            }
+          }
+        }
+        localStorage.setItem('wbw_offline_last_page', p.toString());
+      } catch (err) {
+        console.warn(`Error caching word audio for page ${p}:`, err);
+      }
+
+      await new Promise(r => setTimeout(r, 60));
+    }
+
+    localStorage.setItem('wbw_offline_completed', 'true');
+    setWbwDownloadStatus({
+      isDownloading: false,
+      isPaused: false,
+      currentPage: 604,
+      totalPages: 604,
+      percent: 100,
+      isComplete: true,
+    });
+  };
+
+  const pauseWbwDownload = () => {
+    wbwCancelRef.current = true;
+    setWbwDownloadStatus(prev => ({ ...prev, isDownloading: false, isPaused: true }));
+  };
 
   useEffect(() => {
     localStorage.setItem('dark_mode', isDarkMode.toString());
@@ -1364,20 +1694,33 @@ export default function App() {
   const loadSurah = async (surah: any, page: number = 1, append: boolean = false) => {
     setSelectedSurahObj(surah);
     setIsLoadingQuran(true);
+    const apiReciter = getApiReciterId(selectedReciter);
+    
+    // Check IndexedDB cache first
+    const cached = await getSurahFromDB(surah.id, apiReciter);
+    if (cached && cached.length > 0 && !append) {
+      setVerses(cached);
+      setIsLoadingQuran(false);
+    }
+
     try {
-      const apiReciter = getApiReciterId(selectedReciter);
       const res = await fetch(`https://api.quran.com/api/v4/verses/by_chapter/${surah.id}?language=ar&words=true&word_fields=text_uthmani,text_uthmani_tajweed,audio_url&audio=${apiReciter}&page=${page}&per_page=20`);
-      const data = await res.json();
-      if (append) {
-        setVerses(prev => [...prev, ...data.verses]);
-      } else {
-        setVerses(data.verses);
-        setQuranPage(1);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.verses) {
+          if (append) {
+            setVerses(prev => [...prev, ...data.verses]);
+          } else {
+            setVerses(data.verses);
+            setQuranPage(1);
+            saveSurahToDB(surah.id, apiReciter, data.verses);
+          }
+          if (data.pagination) setQuranTotalPages(data.pagination.total_pages);
+          setQuranPage(page);
+        }
       }
-      setQuranTotalPages(data.pagination.total_pages);
-      setQuranPage(page);
     } catch (err) {
-      console.error("Failed to fetch verses", err);
+      console.warn("Failed or offline fetching surah verses", err);
     } finally {
       setIsLoadingQuran(false);
     }
@@ -1391,17 +1734,28 @@ export default function App() {
     if (continuousAudioRef.current) {
       continuousAudioRef.current.pause();
     }
+    const apiReciter = getApiReciterId(selectedReciter);
+    
+    // Check IndexedDB cache first
+    const cached = await getSurahFromDB(surah.id + 1000, apiReciter);
+    if (cached && cached.length > 0) {
+      setContinuousVerses(cached);
+      setIsLoadingContinuous(false);
+      if (autoPlay) setIsContinuousAudioPlaying(true);
+    }
+
     try {
-      // Fetch all verses at once (per_page=300 covers the longest surah Al-Baqarah which is 286)
-      const apiReciter = getApiReciterId(selectedReciter);
       const res = await fetch(`https://api.quran.com/api/v4/verses/by_chapter/${surah.id}?language=ar&words=true&word_fields=text_uthmani,text_uthmani_tajweed,audio_url&audio=${apiReciter}&page=1&per_page=300`);
-      const data = await res.json();
-      setContinuousVerses(data.verses);
-      if (autoPlay) {
-        setIsContinuousAudioPlaying(true);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.verses) {
+          setContinuousVerses(data.verses);
+          saveSurahToDB(surah.id + 1000, apiReciter, data.verses);
+          if (autoPlay) setIsContinuousAudioPlaying(true);
+        }
       }
     } catch (err) {
-      console.error("Failed to fetch continuous verses", err);
+      console.warn("Failed or offline fetching continuous verses", err);
     } finally {
       setIsLoadingContinuous(false);
     }
@@ -1420,7 +1774,7 @@ export default function App() {
     }
   };
 
-  const playAudio = (url: string | undefined, type: 'word' | 'verse', id: string | number) => {
+  const playAudio = async (url: string | undefined, type: 'word' | 'verse', id: string | number) => {
     if (audioRef.current) {
       audioRef.current.pause();
       if (playingWordId === id || playingVerseKey === id) {
@@ -1446,7 +1800,13 @@ export default function App() {
       fullUrl = `https:${urlToPlay}`;
     }
     
-    const audio = new Audio(fullUrl);
+    const isWbw = (type === 'word');
+    
+    // Check if offline cached audio blob is available
+    const cachedBlobUrl = await getCachedAudioBlobUrl(fullUrl, isWbw);
+    const playTargetUrl = cachedBlobUrl || fullUrl;
+    
+    const audio = new Audio(playTargetUrl);
     
     audio.onplay = () => {
       if (type === 'word') setPlayingWordId(id as number);
@@ -1466,8 +1826,13 @@ export default function App() {
       console.error("Audio failed to load:", fullUrl);
     };
 
-    audio.play();
+    audio.play().catch(e => console.warn("Audio play error:", e));
     audioRef.current = audio;
+
+    // Cache online stream for offline use on subsequent plays
+    if (!cachedBlobUrl && navigator.onLine) {
+      cacheAudioFile(fullUrl, isWbw);
+    }
   };
 
   const speakWord = (text: string) => {
@@ -2206,6 +2571,8 @@ export default function App() {
             downloadIllustratedImage={downloadIllustratedImage}
             getCorrectWordAudioUrl={getCorrectWordAudioUrl}
             cleanTajweed={cleanTajweed}
+            openWbwOfflineModal={() => setShowWbwOfflineModal(true)}
+            wbwDownloadStatus={wbwDownloadStatus}
           />
         )}
         {activeTab === 'dictionary' && (
@@ -3164,6 +3531,17 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* Word-by-word Offline Download Dialog */}
+      <WbwOfflineModal 
+        isOpen={showWbwOfflineModal}
+        onClose={() => setShowWbwOfflineModal(false)}
+        status={wbwDownloadStatus}
+        onStart={startWbwDownload}
+        onPause={pauseWbwDownload}
+        onResume={startWbwDownload}
+        isDarkMode={isDarkMode}
+      />
     </div>
   );
 }
