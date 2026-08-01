@@ -14,37 +14,136 @@
   --font-kurdish: "Noto Sans Arabic", sans-serif;
 }
 
-.quran-text {
+.quran-text,
+.quran-word {
   /* Default font, can be overridden by inline styles */
   font-family: 'Uthmanic Hafs', 'Amiri Quran', 'Traditional Arabic', serif;
   color: #1e293b; /* text-slate-800 */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-variant-ligatures: common-ligatures discretionary-ligatures historical-ligatures contextual;
+  font-feature-settings: "liga" 1, "calt" 1, "mset" 1, "clig" 1, "rlig" 1;
+  -webkit-text-size-adjust: 100%;
+  direction: rtl;
+  unicode-bidi: isolate;
 }
 
-/* Highly Visible Tajweed Colors */
-.quran-text .madd, .quran-text [class*="madd"], .quran-text [class*="madda"] { color: #FF0000 !important; } /* Bright Red */
-.quran-text .ghunnah, .quran-text [class*="ghunnah"] { color: #00A000 !important; } /* Bright Green */
-.quran-text .slnt, .quran-text [class*="slnt"], .quran-text [class*="silent"] { color: #9E9E9E !important; } /* Gray (Silent) */
-.quran-text .qalqalah, .quran-text [class*="qalaqah"], .quran-text [class*="qalqalah"] { color: #0000FF !important; } /* Bright Blue */
-.quran-text .ikhfa, .quran-text [class*="ikhafa"], .quran-text [class*="ikhfa"] { color: #FF7F00 !important; } /* Orange */
-.quran-text .idgham, .quran-text [class*="idgham"] { color: #9C27B0 !important; } /* Purple */
-.quran-text .iqlab, .quran-text [class*="iqlab"] { color: #00BCD4 !important; } /* Cyan */
-.quran-text .ham_wasl, .quran-text [class*="ham_wasl"] { color: #8F9CAE !important; } /* Muted blue-gray for Hamzatul Wasl */
-
-/* Force custom <rule> tags to use display: contents to preserve cursive Arabic letter connections */
-.quran-text rule {
-  display: contents !important;
-}
-
-.quran-word span {
+/* Fix WebKit / iOS Safari inline element font shaping and letter joining across Tajweed tags */
+.quran-text span,
+.quran-text rule,
+.quran-word span,
+.quran-word rule,
+.quran-text [class*="madd"],
+.quran-text [class*="ghunnah"],
+.quran-text [class*="slnt"],
+.quran-text [class*="silent"],
+.quran-text [class*="qalaqah"],
+.quran-text [class*="qalqalah"],
+.quran-text [class*="ikhafa"],
+.quran-text [class*="ikhfa"],
+.quran-text [class*="idgham"],
+.quran-text [class*="iqlab"],
+.quran-text [class*="ham_wasl"],
+.quran-text [class*="laam_shamsiyah"],
+.quran-text [class*="custom-alef-maksora"],
+.quran-word [class*="madd"],
+.quran-word [class*="ghunnah"],
+.quran-word [class*="slnt"],
+.quran-word [class*="silent"],
+.quran-word [class*="qalaqah"],
+.quran-word [class*="qalqalah"],
+.quran-word [class*="ikhafa"],
+.quran-word [class*="ikhfa"],
+.quran-word [class*="idgham"],
+.quran-word [class*="iqlab"],
+.quran-word [class*="ham_wasl"],
+.quran-word [class*="laam_shamsiyah"],
+.quran-word [class*="custom-alef-maksora"] {
   display: inline !important;
-  font-weight: inherit !important;
+  white-space: inherit !important;
+  font-family: inherit !important;
+  font-size: inherit !important;
   font-style: inherit !important;
+  font-weight: inherit !important;
+  letter-spacing: normal !important;
+  word-spacing: normal !important;
+  line-height: inherit !important;
+  vertical-align: baseline !important;
   margin: 0 !important;
   padding: 0 !important;
   border: none !important;
+  background: transparent !important;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+/* Highly Visible Tajweed Colors */
+/* Madd (Red) */
+.quran-text .madd,
+.quran-text [class*="madd"],
+.quran-text [class*="madda"],
+.quran-word [class*="madd"],
+.quran-word [class*="madda"] {
+  color: #FF0000 !important;
+}
+
+/* Ghunnah (Green) */
+.quran-text .ghunnah,
+.quran-text [class*="ghunnah"],
+.quran-word [class*="ghunnah"] {
+  color: #00A000 !important;
+}
+
+/* Silent / Hamzatul Wasl / Lam Shamsiyah (Gray) */
+.quran-text .slnt,
+.quran-text [class*="slnt"],
+.quran-text [class*="silent"],
+.quran-text .ham_wasl,
+.quran-text [class*="ham_wasl"],
+.quran-text [class*="laam_shamsiyah"],
+.quran-word [class*="slnt"],
+.quran-word [class*="silent"],
+.quran-word [class*="ham_wasl"],
+.quran-word [class*="laam_shamsiyah"] {
+  color: #9E9E9E !important;
+}
+
+/* Qalqalah (Blue) */
+.quran-text .qalqalah,
+.quran-text [class*="qalaqah"],
+.quran-text [class*="qalqalah"],
+.quran-word [class*="qalaqah"],
+.quran-word [class*="qalqalah"] {
+  color: #0000FF !important;
+}
+
+/* Ikhfa (Orange) */
+.quran-text .ikhfa,
+.quran-text [class*="ikhafa"],
+.quran-text [class*="ikhfa"],
+.quran-word [class*="ikhafa"],
+.quran-word [class*="ikhfa"] {
+  color: #FF7F00 !important;
+}
+
+/* Idgham (Purple) */
+.quran-text .idgham,
+.quran-text [class*="idgham"],
+.quran-word [class*="idgham"] {
+  color: #9C27B0 !important;
+}
+
+/* Iqlab (Cyan) */
+.quran-text .iqlab,
+.quran-text [class*="iqlab"],
+.quran-word [class*="iqlab"] {
+  color: #00BCD4 !important;
 }
 
 /* Class to disable tajweed colors while keeping the correct text structure */
+.quran-text.no-tajweed-colors span,
+.quran-text.no-tajweed-colors rule,
 .quran-text.no-tajweed-colors [class*="madd"],
 .quran-text.no-tajweed-colors [class*="madda"],
 .quran-text.no-tajweed-colors [class*="ghunnah"],
@@ -57,27 +156,42 @@
 .quran-text.no-tajweed-colors [class*="idgham"],
 .quran-text.no-tajweed-colors [class*="iqlab"],
 .quran-text.no-tajweed-colors [class*="ham_wasl"],
-.quran-text.no-tajweed-colors .madd,
-.quran-text.no-tajweed-colors .ghunnah,
-.quran-text.no-tajweed-colors .slnt,
-.quran-text.no-tajweed-colors .qalqalah,
-.quran-text.no-tajweed-colors .ikhfa,
-.quran-text.no-tajweed-colors .idgham,
-.quran-text.no-tajweed-colors .iqlab,
-.quran-text.no-tajweed-colors .ham_wasl {
+.quran-text.no-tajweed-colors [class*="laam_shamsiyah"],
+.quran-word.no-tajweed-colors span,
+.quran-word.no-tajweed-colors [class*="madd"],
+.quran-word.no-tajweed-colors [class*="madda"],
+.quran-word.no-tajweed-colors [class*="ghunnah"],
+.quran-word.no-tajweed-colors [class*="slnt"],
+.quran-word.no-tajweed-colors [class*="silent"],
+.quran-word.no-tajweed-colors [class*="qalaqah"],
+.quran-word.no-tajweed-colors [class*="qalqalah"],
+.quran-word.no-tajweed-colors [class*="ikhafa"],
+.quran-word.no-tajweed-colors [class*="ikhfa"],
+.quran-word.no-tajweed-colors [class*="idgham"],
+.quran-word.no-tajweed-colors [class*="iqlab"],
+.quran-word.no-tajweed-colors [class*="ham_wasl"],
+.quran-word.no-tajweed-colors [class*="laam_shamsiyah"] {
   color: inherit !important;
   font-weight: inherit !important;
 }
 
-.dark .quran-text:not(.no-tajweed-colors) {
+.dark .quran-text:not(.no-tajweed-colors),
+.dark .quran-word:not(.no-tajweed-colors) {
   color: #e2e8f0; /* text-slate-200 */
 }
 
-.dark .quran-text.no-tajweed-colors {
+.dark .quran-text.no-tajweed-colors,
+.dark .quran-word.no-tajweed-colors {
   color: #e2e8f0;
 }
 
-.dark .quran-text .slnt,
-.dark .quran-text [class*="slnt"] {
-  color: #64748b; /* Muted gray for dark mode */
+.dark .quran-text [class*="slnt"],
+.dark .quran-text [class*="silent"],
+.dark .quran-text [class*="ham_wasl"],
+.dark .quran-text [class*="laam_shamsiyah"],
+.dark .quran-word [class*="slnt"],
+.dark .quran-word [class*="silent"],
+.dark .quran-word [class*="ham_wasl"],
+.dark .quran-word [class*="laam_shamsiyah"] {
+  color: #64748b !important; /* Muted gray for dark mode */
 }

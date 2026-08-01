@@ -58,8 +58,11 @@ const commonWords = [
 
 const cleanTajweed = (text: string) => {
   if (!text) return '';
-  // Remove black circle (U+25CF)
-  return text.replace(/\u25CF/g, '');
+  let cleaned = text.replace(/\u25CF/g, '');
+  // Transform non-standard <rule class=...> tags into standard <span class="..."> tags for WebKit/iOS Safari compatibility
+  cleaned = cleaned.replace(/<rule\s+class=["']?([^"'\s>]+)["']?>/g, '<span class="$1">');
+  cleaned = cleaned.replace(/<\/rule>/g, '</span>');
+  return cleaned;
 };
 
 const getCorrectWordAudioUrl = (word: any, wordsList: any[], verseKey: string): string => {
