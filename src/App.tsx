@@ -1969,6 +1969,9 @@ export default function App() {
     const currentVerse = continuousVerses[continuousVerseIndex];
     if (!currentVerse) return;
 
+    setPlayingVerseKey(currentVerse.verse_key);
+    playingVerseKeyRef.current = currentVerse.verse_key;
+
     const currentUrl = getResolvedUrlSync(currentVerse);
     if (!currentUrl) {
       setContinuousVerseIndex(prev => prev + 1);
@@ -2114,10 +2117,11 @@ export default function App() {
     setSurahs(fallbackChapters);
   };
 
-  const loadSurah = async (surah: any, page: number = 1, append: boolean = false) => {
+  const loadSurah = async (surah: any, page: number = 1, append: boolean = false, overrideReciter?: number) => {
+    const reciterToUse = overrideReciter !== undefined ? overrideReciter : selectedReciter;
     setSelectedSurahObj(surah);
     setIsLoadingQuran(true);
-    const apiReciter = getApiReciterId(selectedReciter);
+    const apiReciter = getApiReciterId(reciterToUse);
     
     // Check IndexedDB cache first
     const cached = await getSurahFromDB(surah.id, apiReciter);
@@ -2125,6 +2129,7 @@ export default function App() {
       setVerses(cached);
       setQuranTotalPages(1);
       setIsLoadingQuran(false);
+      return;
     }
 
     try {
@@ -2150,9 +2155,31 @@ export default function App() {
     }
   };
 
+  const getQdcReciterId = (reciterId: number): number | null => {
+    const qdcMap: Record<number, number> = {
+      2: 2,   // عبد الباسط عبد الصمد
+      3: 3,   // عبد الرحمن السديس
+      4: 4,   // أبو بكر الشاطري
+      6: 6,   // محمود خليل الحصري
+      7: 7,   // ميشاري العفاسي
+      9: 9,   // محمد صديق المنشاوي
+      10: 10, // سعود الشريم
+      67: 97, // ياسر الدوسري
+    };
+    return qdcMap[reciterId] || null;
+  };
+
   const fetchQdcChapterAudio = async (surahId: number, reciterId: number) => {
+    qdcChapterAudioUrlRef.current = null;
+    qdcVerseTimingsRef.current = [];
+
+    const qdcId = getQdcReciterId(reciterId);
+    if (!qdcId) {
+      return null;
+    }
+
     try {
-      const res = await fetch(`https://api.qurancdn.com/api/qdc/audio/reciters/${reciterId}/audio_files?chapter=${surahId}&segments=true`);
+      const res = await fetch(`https://api.qurancdn.com/api/qdc/audio/reciters/${qdcId}/audio_files?chapter=${surahId}&segments=true`);
       if (res.ok) {
         const data = await res.json();
         const af = data.audio_files?.[0];
@@ -2165,8 +2192,6 @@ export default function App() {
     } catch (e) {
       console.warn("QDC chapter audio fetch error:", e);
     }
-    qdcChapterAudioUrlRef.current = null;
-    qdcVerseTimingsRef.current = [];
     return null;
   };
 
@@ -2180,7 +2205,7 @@ export default function App() {
           const seg = vt.segments.find((s: any) => s[0] === wordPosition);
           if (seg) seekMs = seg[1];
         }
-        if (continuousAudioRef.current) {
+        if (continuousAudioRef.current && qdcChapterAudioUrlRef.current && continuousAudioRef.current.src === qdcChapterAudioUrlRef.current) {
           continuousAudioRef.current.currentTime = seekMs / 1000;
           continuousAudioRef.current.play().catch(e => console.warn("Seek play error:", e));
           setIsContinuousAudioPlaying(true);
@@ -2195,7 +2220,8 @@ export default function App() {
     }
   };
 
-  const loadContinuousSurah = async (surah: any, autoPlay: boolean = false) => {
+  const loadContinuousSurah = async (surah: any, autoPlay: boolean = false, overrideReciter?: number) => {
+    const reciterToUse = overrideReciter !== undefined ? overrideReciter : selectedReciter;
     setContinuousSurahObj(surah);
     setIsLoadingContinuous(true);
     setContinuousVerseIndex(0);
@@ -2206,10 +2232,15 @@ export default function App() {
       continuousAudioRef.current.pause();
       continuousAudioRef.current = null;
     }
-    const apiReciter = getApiReciterId(selectedReciter);
+
+    resolvedUrlsMapRef.current.clear();
+    qdcChapterAudioUrlRef.current = null;
+    qdcVerseTimingsRef.current = [];
+
+    const apiReciter = getApiReciterId(reciterToUse);
     
     // Fetch QDC full surah continuous audio & word segment timings
-    fetchQdcChapterAudio(surah.id, selectedReciter);
+    await fetchQdcChapterAudio(surah.id, reciterToUse);
 
     // Check IndexedDB cache first
     const cached = await getSurahFromDB(surah.id + 1000, apiReciter);
@@ -2217,6 +2248,7 @@ export default function App() {
       setContinuousVerses(cached);
       setIsLoadingContinuous(false);
       if (autoPlay) setIsContinuousAudioPlaying(true);
+      return;
     }
 
     try {
@@ -2239,13 +2271,32 @@ export default function App() {
   const handleReciterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newReciter = Number(e.target.value);
     setSelectedReciter(newReciter);
+
+    if (continuousAudioRef.current) {
+      continuousAudioRef.current.pause();
+      continuousAudioRef.current = null;
+    }
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    setPlayingWordId(null);
+    setPlayingVerseKey(null);
+    setPlayingWordLocation(null);
+
+    resolvedUrlsMapRef.current.clear();
+    qdcChapterAudioUrlRef.current = null;
+    qdcVerseTimingsRef.current = [];
+
+    const wasPlaying = isContinuousAudioPlaying;
+    setIsContinuousAudioPlaying(false);
+
     if (selectedSurahObj) {
-      // Reload current surah from page 1 with new reciter
-      loadSurah(selectedSurahObj, 1, false);
+      loadSurah(selectedSurahObj, 1, false, newReciter);
     }
     if (continuousSurahObj) {
-      // Reload current continuous surah with new reciter
-      loadContinuousSurah(continuousSurahObj, isContinuousAudioPlaying);
+      loadContinuousSurah(continuousSurahObj, wasPlaying, newReciter);
     }
   };
 
