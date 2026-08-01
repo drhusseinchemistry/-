@@ -57,12 +57,50 @@ const commonWords = [
   { word: 'هُدًى', meaning: 'رێنمایی / هیدایەت' }
 ];
 
+const ISOLATED_OR_RIGHT_ONLY = new Set([
+  'ا', 'أ', 'إ', 'آ', 'ٱ', 'د', 'ذ', 'ر', 'ز', 'و', 'ؤ', 'ة', 'ۦ', 'ۥ', ' ',
+  '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩', '٠', 'ۚ', 'ۗ', 'ۖ', 'ۛ', 'ۜ', 'ۣ'
+]);
+
+const isJoiningChar = (ch: string) => {
+  if (!ch) return false;
+  return !ISOLATED_OR_RIGHT_ONLY.has(ch);
+};
+
 const cleanTajweed = (text: string) => {
   if (!text) return '';
   let cleaned = text.replace(/\u25CF/g, '');
-  // Transform non-standard <rule class=...> tags into standard <span class="..."> tags for WebKit/iOS Safari compatibility
-  cleaned = cleaned.replace(/<rule\s+class=["']?([^"'\s>]+)["']?>/g, '<span class="$1">');
-  cleaned = cleaned.replace(/<\/rule>/g, '</span>');
+
+  // Normalize <rule class=...> and <tajweed class=...> to <span class="...">
+  cleaned = cleaned
+    .replace(/<(rule|tajweed)\s+class=["']?([^"'\s>]+)["']?>/g, '<span class="$2">')
+    .replace(/<\/(rule|tajweed)>/g, '</span>');
+
+  // Insert Zero-Width Joiner (\u200D) at tag boundaries so WebKit/CoreText (iOS Safari)
+  // maintains cursive Arabic letter joining across colored span tags
+  const ZWJ = '\u200D';
+
+  // Add ZWJ inside spans where content starts or ends with joining characters
+  cleaned = cleaned.replace(/(<span\s+class="[^"]+">)([^<]+)(<\/span>)/g, (match, openTag, content, closeTag) => {
+    const trimmed = content.trim();
+    if (!trimmed) return match;
+    const firstChar = trimmed[0];
+    const lastChar = trimmed[trimmed.length - 1];
+
+    const prefix = isJoiningChar(firstChar) ? ZWJ : '';
+    const suffix = isJoiningChar(lastChar) ? ZWJ : '';
+
+    return openTag + prefix + content + suffix + closeTag;
+  });
+
+  // If span ends with ZWJ and is immediately followed by a joining character outside span, insert ZWJ before that char
+  cleaned = cleaned.replace(/(<\/span>)([\u0600-\u06FF])/g, (match, closeTag, nextChar) => {
+    if (isJoiningChar(nextChar)) {
+      return closeTag + ZWJ + nextChar;
+    }
+    return match;
+  });
+
   return cleaned;
 };
 

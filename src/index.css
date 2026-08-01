@@ -43,8 +43,10 @@
 /* Fix WebKit / iOS Safari inline element font shaping and letter joining across Tajweed tags */
 .quran-text span,
 .quran-text rule,
+.quran-text tajweed,
 .quran-word span,
 .quran-word rule,
+.quran-word tajweed,
 .quran-text [class*="madd"],
 .quran-text [class*="ghunnah"],
 .quran-text [class*="slnt"],
@@ -86,6 +88,9 @@
   padding: 0 !important;
   border: none !important;
   background: transparent !important;
+  font-variant-ligatures: normal common-ligatures discretionary-ligatures historical-ligatures contextual !important;
+  font-feature-settings: "liga" 1, "calt" 1, "mset" 1, "clig" 1, "rlig" 1 !important;
+  -webkit-font-feature-settings: "liga" 1, "calt" 1, "mset" 1, "clig" 1, "rlig" 1 !important;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
